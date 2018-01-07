@@ -1,10 +1,9 @@
-#include "MEM.h"
 #include "DBG.h"
+#include "MEM.h"
 #include "diksamc.h"
 
-DeclarationList *
-dkc_chain_declaration(DeclarationList *list, Declaration *decl)
-{
+DeclarationList *dkc_chain_declaration(DeclarationList *list,
+                                       Declaration *decl) {
     DeclarationList *new_item;
     DeclarationList *pos;
 
@@ -23,9 +22,7 @@ dkc_chain_declaration(DeclarationList *list, Declaration *decl)
     return list;
 }
 
-Declaration *
-dkc_alloc_declaration(TypeSpecifier *type, char *identifier)
-{
+Declaration *dkc_alloc_declaration(TypeSpecifier *type, char *identifier) {
     Declaration *decl;
 
     decl = dkc_malloc(sizeof(Declaration));
@@ -36,10 +33,9 @@ dkc_alloc_declaration(TypeSpecifier *type, char *identifier)
     return decl;
 }
 
-static FunctionDefinition *
-create_function_definition(DVM_BasicType type, char *identifier,
-                           ParameterList *parameter_list, Block *block)
-{
+static FunctionDefinition *create_function_definition(
+    DVM_BasicType type, char *identifier, ParameterList *parameter_list,
+    Block *block) {
     FunctionDefinition *fd;
     DKC_Compiler *compiler;
 
@@ -59,24 +55,20 @@ create_function_definition(DVM_BasicType type, char *identifier,
     return fd;
 }
 
-void
-dkc_function_define(DVM_BasicType type, char *identifier,
-                    ParameterList *parameter_list, Block *block)
-{
+void dkc_function_define(DVM_BasicType type, char *identifier,
+                         ParameterList *parameter_list, Block *block) {
     FunctionDefinition *fd;
     FunctionDefinition *pos;
     DKC_Compiler *compiler;
 
-    if (dkc_search_function(identifier)
-        || dkc_search_declaration(identifier, NULL)) {
+    if (dkc_search_function(identifier) ||
+        dkc_search_declaration(identifier, NULL)) {
         dkc_compile_error(dkc_get_current_compiler()->current_line_number,
-                          FUNCTION_MULTIPLE_DEFINE_ERR,
-                          STRING_MESSAGE_ARGUMENT, "name", identifier,
-                          MESSAGE_ARGUMENT_END);
+                          FUNCTION_MULTIPLE_DEFINE_ERR, STRING_MESSAGE_ARGUMENT,
+                          "name", identifier, MESSAGE_ARGUMENT_END);
         return;
     }
-    fd = create_function_definition(type, identifier, parameter_list,
-                                    block);
+    fd = create_function_definition(type, identifier, parameter_list, block);
     if (block) {
         block->type = FUNCTION_BLOCK;
         block->parent.function.function = fd;
@@ -92,10 +84,8 @@ dkc_function_define(DVM_BasicType type, char *identifier,
     }
 }
 
-ParameterList *
-dkc_create_parameter(DVM_BasicType type, char *identifier)
-{
-    ParameterList       *p;
+ParameterList *dkc_create_parameter(DVM_BasicType type, char *identifier) {
+    ParameterList *p;
 
     p = dkc_malloc(sizeof(ParameterList));
     p->name = identifier;
@@ -106,10 +96,8 @@ dkc_create_parameter(DVM_BasicType type, char *identifier)
     return p;
 }
 
-ParameterList *
-dkc_chain_parameter(ParameterList *list, DVM_BasicType type,
-                    char *identifier)
-{
+ParameterList *dkc_chain_parameter(ParameterList *list, DVM_BasicType type,
+                                   char *identifier) {
     ParameterList *pos;
 
     for (pos = list; pos->next; pos = pos->next)
@@ -119,9 +107,7 @@ dkc_chain_parameter(ParameterList *list, DVM_BasicType type,
     return list;
 }
 
-ArgumentList *
-dkc_create_argument_list(Expression *expression)
-{
+ArgumentList *dkc_create_argument_list(Expression *expression) {
     ArgumentList *al;
 
     al = dkc_malloc(sizeof(ArgumentList));
@@ -131,9 +117,7 @@ dkc_create_argument_list(Expression *expression)
     return al;
 }
 
-ArgumentList *
-dkc_chain_argument_list(ArgumentList *list, Expression *expr)
-{
+ArgumentList *dkc_chain_argument_list(ArgumentList *list, Expression *expr) {
     ArgumentList *pos;
 
     for (pos = list; pos->next; pos = pos->next)
@@ -143,9 +127,7 @@ dkc_chain_argument_list(ArgumentList *list, Expression *expr)
     return list;
 }
 
-StatementList *
-dkc_create_statement_list(Statement *statement)
-{
+StatementList *dkc_create_statement_list(Statement *statement) {
     StatementList *sl;
 
     sl = dkc_malloc(sizeof(StatementList));
@@ -155,13 +137,11 @@ dkc_create_statement_list(Statement *statement)
     return sl;
 }
 
-StatementList *
-dkc_chain_statement_list(StatementList *list, Statement *statement)
-{
+StatementList *dkc_chain_statement_list(StatementList *list,
+                                        Statement *statement) {
     StatementList *pos;
 
-    if (list == NULL)
-        return dkc_create_statement_list(statement);
+    if (list == NULL) return dkc_create_statement_list(statement);
 
     for (pos = list; pos->next; pos = pos->next)
         ;
@@ -170,10 +150,8 @@ dkc_chain_statement_list(StatementList *list, Statement *statement)
     return list;
 }
 
-Expression *
-dkc_alloc_expression(ExpressionKind kind)
-{
-    Expression  *exp;
+Expression *dkc_alloc_expression(ExpressionKind kind) {
+    Expression *exp;
 
     exp = dkc_malloc(sizeof(Expression));
     exp->type = NULL;
@@ -183,9 +161,7 @@ dkc_alloc_expression(ExpressionKind kind)
     return exp;
 }
 
-Expression *
-dkc_create_comma_expression(Expression *left, Expression *right)
-{
+Expression *dkc_create_comma_expression(Expression *left, Expression *right) {
     Expression *exp;
 
     exp = dkc_alloc_expression(COMMA_EXPRESSION);
@@ -195,24 +171,21 @@ dkc_create_comma_expression(Expression *left, Expression *right)
     return exp;
 }
 
-Expression *
-dkc_create_assign_expression(Expression *left, AssignmentOperator operator,
-                             Expression *operand)
-{
+Expression *dkc_create_assign_expression(Expression *left,
+                                         AssignmentOperator operator,
+                                         Expression *operand) {
     Expression *exp;
 
     exp = dkc_alloc_expression(ASSIGN_EXPRESSION);
     exp->u.assign_expression.left = left;
-    exp->u.assign_expression.operator = operator;
+    exp->u.assign_expression.operator= operator;
     exp->u.assign_expression.operand = operand;
 
     return exp;
 }
 
-Expression *
-dkc_create_binary_expression(ExpressionKind operator,
-                             Expression *left, Expression *right)
-{
+Expression *dkc_create_binary_expression(ExpressionKind operator,
+                                         Expression *left, Expression *right) {
 #if 0
     if ((left->kind == INT_EXPRESSION
          || left->kind == DOUBLE_EXPRESSION)
@@ -227,19 +200,17 @@ dkc_create_binary_expression(ExpressionKind operator,
         return left;
     } else {
 #endif
-        Expression *exp;
-        exp = dkc_alloc_expression(operator);
-        exp->u.binary_expression.left = left;
-        exp->u.binary_expression.right = right;
-        return exp;
+    Expression *exp;
+    exp = dkc_alloc_expression(operator);
+    exp->u.binary_expression.left = left;
+    exp->u.binary_expression.right = right;
+    return exp;
 #if 0
     }
 #endif
 }
 
-Expression *
-dkc_create_minus_expression(Expression *operand)
-{
+Expression *dkc_create_minus_expression(Expression *operand) {
 #if 0
     if (operand->kind == INT_EXPRESSION
         || operand->kind == DOUBLE_EXPRESSION) {
@@ -251,19 +222,17 @@ dkc_create_minus_expression(Expression *operand)
         return operand;
     } else {
 #endif
-        Expression      *exp;
-        exp = dkc_alloc_expression(MINUS_EXPRESSION);
-        exp->u.minus_expression = operand;
-        return exp;
+    Expression *exp;
+    exp = dkc_alloc_expression(MINUS_EXPRESSION);
+    exp->u.minus_expression = operand;
+    return exp;
 #if 0
     }
 #endif
 }
 
-Expression *
-dkc_create_logical_not_expression(Expression *operand)
-{
-    Expression  *exp;
+Expression *dkc_create_logical_not_expression(Expression *operand) {
+    Expression *exp;
 
     exp = dkc_alloc_expression(LOGICAL_NOT_EXPRESSION);
     exp->u.logical_not = operand;
@@ -271,9 +240,8 @@ dkc_create_logical_not_expression(Expression *operand)
     return exp;
 }
 
-Expression *
-dkc_create_incdec_expression(Expression *operand, ExpressionKind inc_or_dec)
-{
+Expression *dkc_create_incdec_expression(Expression *operand,
+                                         ExpressionKind inc_or_dec) {
     Expression *exp;
 
     exp = dkc_alloc_expression(inc_or_dec);
@@ -282,11 +250,8 @@ dkc_create_incdec_expression(Expression *operand, ExpressionKind inc_or_dec)
     return exp;
 }
 
-
-Expression *
-dkc_create_identifier_expression(char *identifier)
-{
-    Expression  *exp;
+Expression *dkc_create_identifier_expression(char *identifier) {
+    Expression *exp;
 
     exp = dkc_alloc_expression(IDENTIFIER_EXPRESSION);
     exp->u.identifier.name = identifier;
@@ -294,11 +259,9 @@ dkc_create_identifier_expression(char *identifier)
     return exp;
 }
 
-Expression *
-dkc_create_function_call_expression(Expression *function,
-                                    ArgumentList *argument)
-{
-    Expression  *exp;
+Expression *dkc_create_function_call_expression(Expression *function,
+                                                ArgumentList *argument) {
+    Expression *exp;
 
     exp = dkc_alloc_expression(FUNCTION_CALL_EXPRESSION);
     exp->u.function_call_expression.function = function;
@@ -307,9 +270,7 @@ dkc_create_function_call_expression(Expression *function,
     return exp;
 }
 
-Expression *
-dkc_create_boolean_expression(DVM_Boolean value)
-{
+Expression *dkc_create_boolean_expression(DVM_Boolean value) {
     Expression *exp;
 
     exp = dkc_alloc_expression(BOOLEAN_EXPRESSION);
@@ -318,9 +279,7 @@ dkc_create_boolean_expression(DVM_Boolean value)
     return exp;
 }
 
-static Statement *
-alloc_statement(StatementType type)
-{
+static Statement *alloc_statement(StatementType type) {
     Statement *st;
 
     st = dkc_malloc(sizeof(Statement));
@@ -330,11 +289,8 @@ alloc_statement(StatementType type)
     return st;
 }
 
-Statement *
-dkc_create_if_statement(Expression *condition,
-                        Block *then_block, Elsif *elsif_list,
-                        Block *else_block)
-{
+Statement *dkc_create_if_statement(Expression *condition, Block *then_block,
+                                   Elsif *elsif_list, Block *else_block) {
     Statement *st;
 
     st = alloc_statement(IF_STATEMENT);
@@ -346,9 +302,7 @@ dkc_create_if_statement(Expression *condition,
     return st;
 }
 
-Elsif *
-dkc_chain_elsif_list(Elsif *list, Elsif *add)
-{
+Elsif *dkc_chain_elsif_list(Elsif *list, Elsif *add) {
     Elsif *pos;
 
     for (pos = list; pos->next; pos = pos->next)
@@ -358,9 +312,7 @@ dkc_chain_elsif_list(Elsif *list, Elsif *add)
     return list;
 }
 
-Elsif *
-dkc_create_elsif(Expression *expr, Block *block)
-{
+Elsif *dkc_create_elsif(Expression *expr, Block *block) {
     Elsif *ei;
 
     ei = dkc_malloc(sizeof(Elsif));
@@ -371,10 +323,8 @@ dkc_create_elsif(Expression *expr, Block *block)
     return ei;
 }
 
-Statement *
-dkc_create_while_statement(char *label,
-                           Expression *condition, Block *block)
-{
+Statement *dkc_create_while_statement(char *label, Expression *condition,
+                                      Block *block) {
     Statement *st;
 
     st = alloc_statement(WHILE_STATEMENT);
@@ -387,10 +337,9 @@ dkc_create_while_statement(char *label,
     return st;
 }
 
-Statement *
-dkc_create_for_statement(char *label, Expression *init, Expression *cond,
-                         Expression *post, Block *block)
-{
+Statement *dkc_create_for_statement(char *label, Expression *init,
+                                    Expression *cond, Expression *post,
+                                    Block *block) {
     Statement *st;
 
     st = alloc_statement(FOR_STATEMENT);
@@ -405,10 +354,8 @@ dkc_create_for_statement(char *label, Expression *init, Expression *cond,
     return st;
 }
 
-Statement *
-dkc_create_foreach_statement(char *label, char *variable,
-                             Expression *collection, Block *block)
-{
+Statement *dkc_create_foreach_statement(char *label, char *variable,
+                                        Expression *collection, Block *block) {
     Statement *st;
 
     st = alloc_statement(FOREACH_STATEMENT);
@@ -420,9 +367,7 @@ dkc_create_foreach_statement(char *label, char *variable,
     return st;
 }
 
-Block *
-dkc_open_block(void)
-{
+Block *dkc_open_block(void) {
     Block *new_block;
 
     DKC_Compiler *compiler = dkc_get_current_compiler();
@@ -435,22 +380,17 @@ dkc_open_block(void)
     return new_block;
 }
 
-Block *
-dkc_close_block(Block *block, StatementList *statement_list)
-{
+Block *dkc_close_block(Block *block, StatementList *statement_list) {
     DKC_Compiler *compiler = dkc_get_current_compiler();
 
-    DBG_assert(block == compiler->current_block,
-               ("block mismatch.\n"));
+    DBG_assert(block == compiler->current_block, ("block mismatch.\n"));
     block->statement_list = statement_list;
     compiler->current_block = block->outer_block;
 
     return block;
 }
 
-Statement *
-dkc_create_expression_statement(Expression *expression)
-{
+Statement *dkc_create_expression_statement(Expression *expression) {
     Statement *st;
 
     st = alloc_statement(EXPRESSION_STATEMENT);
@@ -459,9 +399,7 @@ dkc_create_expression_statement(Expression *expression)
     return st;
 }
 
-Statement *
-dkc_create_return_statement(Expression *expression)
-{
+Statement *dkc_create_return_statement(Expression *expression) {
     Statement *st;
 
     st = alloc_statement(RETURN_STATEMENT);
@@ -470,9 +408,7 @@ dkc_create_return_statement(Expression *expression)
     return st;
 }
 
-Statement *
-dkc_create_break_statement(char *label)
-{
+Statement *dkc_create_break_statement(char *label) {
     Statement *st;
 
     st = alloc_statement(BREAK_STATEMENT);
@@ -481,9 +417,7 @@ dkc_create_break_statement(char *label)
     return st;
 }
 
-Statement *
-dkc_create_continue_statement(char *label)
-{
+Statement *dkc_create_continue_statement(char *label) {
     Statement *st;
 
     st = alloc_statement(CONTINUE_STATEMENT);
@@ -492,10 +426,8 @@ dkc_create_continue_statement(char *label)
     return st;
 }
 
-Statement *
-dkc_create_try_statement(Block *try_block, char *exception,
-                         Block *catch_block, Block *finally_block)
-{
+Statement *dkc_create_try_statement(Block *try_block, char *exception,
+                                    Block *catch_block, Block *finally_block) {
     Statement *st;
 
     st = alloc_statement(TRY_STATEMENT);
@@ -507,9 +439,7 @@ dkc_create_try_statement(Block *try_block, char *exception,
     return st;
 }
 
-Statement *
-dkc_create_throw_statement(Expression *expression)
-{
+Statement *dkc_create_throw_statement(Expression *expression) {
     Statement *st;
 
     st = alloc_statement(THROW_STATEMENT);
@@ -518,10 +448,9 @@ dkc_create_throw_statement(Expression *expression)
     return st;
 }
 
-Statement *
-dkc_create_declaration_statement(DVM_BasicType type, char *identifier,
-                                 Expression *initializer)
-{
+Statement *dkc_create_declaration_statement(DVM_BasicType type,
+                                            char *identifier,
+                                            Expression *initializer) {
     Statement *st;
     Declaration *decl;
 

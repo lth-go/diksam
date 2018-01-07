@@ -1,20 +1,20 @@
 #ifndef PRIVATE_DIKSAMC_H_INCLUDED
 #define PRIVATE_DIKSAMC_H_INCLUDED
-#include <stdio.h>
 #include <setjmp.h>
+#include <stdio.h>
 #include <wchar.h>
-#include "MEM.h"
 #include "DKC.h"
 #include "DVM_code.h"
+#include "MEM.h"
 #include "share.h"
 
 #define smaller(a, b) ((a) < (b) ? (a) : (b))
 #define larger(a, b) ((a) > (b) ? (a) : (b))
 
-#define MESSAGE_ARGUMENT_MAX    (256)
-#define LINE_BUF_SIZE           (1024)
+#define MESSAGE_ARGUMENT_MAX (256)
+#define LINE_BUF_SIZE (1024)
 
-#define ARRAY_SIZE(array)  (sizeof(array) / sizeof((array)[0]))
+#define ARRAY_SIZE(array) (sizeof(array) / sizeof((array)[0]))
 
 #define UNDEFINED_LABEL (-1)
 
@@ -27,9 +27,7 @@ typedef enum {
     MESSAGE_ARGUMENT_END
 } MessageArgumentType;
 
-typedef struct {
-    char *format;
-} ErrorDefinition;
+typedef struct { char *format; } ErrorDefinition;
 
 typedef enum {
     PARSE_ERR = 1,
@@ -88,33 +86,34 @@ typedef enum {
     EXPRESSION_KIND_COUNT_PLUS_1
 } ExpressionKind;
 
-#define dkc_is_numeric_type(type)\
-  ((type) == DKC_INT_VALUE || (type) == DKC_DOUBLE_VALUE)
+#define dkc_is_numeric_type(type) \
+    ((type) == DKC_INT_VALUE || (type) == DKC_DOUBLE_VALUE)
 
-#define dkc_is_math_operator(operator) \
-  ((operator) == ADD_EXPRESSION || (operator) == SUB_EXPRESSION\
-   || (operator) == MUL_EXPRESSION || (operator) == DIV_EXPRESSION\
-   || (operator) == MOD_EXPRESSION)
+#define dkc_is_math_operator(operator)                               \
+    ((operator) == ADD_EXPRESSION || (operator) == SUB_EXPRESSION || \
+     (operator) == MUL_EXPRESSION || (operator) == DIV_EXPRESSION || \
+     (operator) == MOD_EXPRESSION)
 
-#define dkc_is_compare_operator(operator) \
-  ((operator) == EQ_EXPRESSION || (operator) == NE_EXPRESSION\
-   || (operator) == GT_EXPRESSION || (operator) == GE_EXPRESSION\
-   || (operator) == LT_EXPRESSION || (operator) == LE_EXPRESSION)
+#define dkc_is_compare_operator(operator)                          \
+    ((operator) == EQ_EXPRESSION || (operator) == NE_EXPRESSION || \
+     (operator) == GT_EXPRESSION || (operator) == GE_EXPRESSION || \
+     (operator) == LT_EXPRESSION || (operator) == LE_EXPRESSION)
 
 #define dkc_is_int(type) \
-  ((type)->basic_type == DVM_INT_TYPE && (type)->derive == NULL)
+    ((type)->basic_type == DVM_INT_TYPE && (type)->derive == NULL)
 
 #define dkc_is_double(type) \
-  ((type)->basic_type == DVM_DOUBLE_TYPE && (type)->derive == NULL)
+    ((type)->basic_type == DVM_DOUBLE_TYPE && (type)->derive == NULL)
 
 #define dkc_is_boolean(type) \
-  ((type)->basic_type == DVM_BOOLEAN_TYPE && (type)->derive == NULL)
+    ((type)->basic_type == DVM_BOOLEAN_TYPE && (type)->derive == NULL)
 
 #define dkc_is_string(type) \
-  ((type)->basic_type == DVM_STRING_TYPE && (type)->derive == NULL)
+    ((type)->basic_type == DVM_STRING_TYPE && (type)->derive == NULL)
 
-#define dkc_is_logical_operator(operator) \
-  ((operator) == LOGICAL_AND_EXPRESSION || (operator) == LOGICAL_OR_EXPRESSION)
+#define dkc_is_logical_operator(operator)    \
+    ((operator) == LOGICAL_AND_EXPRESSION || \
+     (operator) == LOGICAL_OR_EXPRESSION)
 
 typedef struct ArgumentList_tag {
     Expression *expression;
@@ -124,39 +123,35 @@ typedef struct ArgumentList_tag {
 typedef struct TypeSpecifier_tag TypeSpecifier;
 
 typedef struct ParameterList_tag {
-    char                *name;
-    TypeSpecifier       *type;
-    int                 line_number;
+    char *name;
+    TypeSpecifier *type;
+    int line_number;
     struct ParameterList_tag *next;
 } ParameterList;
 
-typedef enum {
-    FUNCTION_DERIVE
-} DeriveTag;
+typedef enum { FUNCTION_DERIVE } DeriveTag;
 
-typedef struct {
-    ParameterList       *parameter_list;
-} FunctionDerive;
+typedef struct { ParameterList *parameter_list; } FunctionDerive;
 
 typedef struct TypeDerive_tag {
-    DeriveTag   tag;
+    DeriveTag tag;
     union {
-        FunctionDerive  function_d;
+        FunctionDerive function_d;
     } u;
-    struct TypeDerive_tag       *next;
+    struct TypeDerive_tag *next;
 } TypeDerive;
 
 struct TypeSpecifier_tag {
-    DVM_BasicType       basic_type;
-    TypeDerive  *derive;
+    DVM_BasicType basic_type;
+    TypeDerive *derive;
 };
 
 typedef struct FunctionDefinition_tag FunctionDefinition;
 
 typedef struct {
-    char        *name;
-    TypeSpecifier       *type;
-    Expression  *initializer;
+    char *name;
+    TypeSpecifier *type;
+    Expression *initializer;
     int variable_index;
     DVM_Boolean is_local;
 } Declaration;
@@ -167,17 +162,17 @@ typedef struct DeclarationList_tag {
 } DeclarationList;
 
 typedef struct {
-    char        *name;
+    char *name;
     DVM_Boolean is_function;
     union {
         FunctionDefinition *function;
-        Declaration     *declaration;
+        Declaration *declaration;
     } u;
 } IdentifierExpression;
 
 typedef struct {
-    Expression  *left;
-    Expression  *right;
+    Expression *left;
+    Expression *right;
 } CommaExpression;
 
 typedef enum {
@@ -190,24 +185,22 @@ typedef enum {
 } AssignmentOperator;
 
 typedef struct {
-    AssignmentOperator  operator;
-    Expression  *left;
-    Expression  *operand;
+    AssignmentOperator operator;
+    Expression *left;
+    Expression *operand;
 } AssignExpression;
 
 typedef struct {
-    Expression  *left;
-    Expression  *right;
+    Expression *left;
+    Expression *right;
 } BinaryExpression;
 
 typedef struct {
-    Expression          *function;
-    ArgumentList        *argument;
+    Expression *function;
+    ArgumentList *argument;
 } FunctionCallExpression;
 
-typedef struct {
-    Expression  *operand;
-} IncrementOrDecrement;
+typedef struct { Expression *operand; } IncrementOrDecrement;
 
 typedef enum {
     INT_TO_DOUBLE_CAST,
@@ -218,8 +211,8 @@ typedef enum {
 } CastType;
 
 typedef struct {
-    CastType    type;
-    Expression  *operand;
+    CastType type;
+    Expression *operand;
 } CastExpression;
 
 struct Expression_tag {
@@ -227,27 +220,27 @@ struct Expression_tag {
     ExpressionKind kind;
     int line_number;
     union {
-        DVM_Boolean             boolean_value;
-        int                     int_value;
-        double                  double_value;
-        DVM_Char                *string_value;
-        IdentifierExpression    identifier;
-        CommaExpression         comma;
-        AssignExpression        assign_expression;
-        BinaryExpression        binary_expression;
-        Expression              *minus_expression;
-        Expression              *logical_not;
-        FunctionCallExpression  function_call_expression;
-        IncrementOrDecrement    inc_dec;
-        CastExpression          cast;
+        DVM_Boolean boolean_value;
+        int int_value;
+        double double_value;
+        DVM_Char *string_value;
+        IdentifierExpression identifier;
+        CommaExpression comma;
+        AssignExpression assign_expression;
+        BinaryExpression binary_expression;
+        Expression *minus_expression;
+        Expression *logical_not;
+        FunctionCallExpression function_call_expression;
+        IncrementOrDecrement inc_dec;
+        CastExpression cast;
     } u;
 };
 
 typedef struct Statement_tag Statement;
 
 typedef struct StatementList_tag {
-    Statement   *statement;
-    struct StatementList_tag    *next;
+    Statement *statement;
+    struct StatementList_tag *next;
 } StatementList;
 
 typedef enum {
@@ -258,83 +251,75 @@ typedef enum {
 } BlockType;
 
 typedef struct {
-    Statement   *statement;
-    int         continue_label;
-    int         break_label;
+    Statement *statement;
+    int continue_label;
+    int break_label;
 } StatementBlockInfo;
 
 typedef struct {
-    FunctionDefinition  *function;
-    int         end_label;
+    FunctionDefinition *function;
+    int end_label;
 } FunctionBlockInfo;
 
 typedef struct Block_tag {
-    BlockType           type;
-    struct Block_tag    *outer_block;
-    StatementList       *statement_list;
-    DeclarationList     *declaration_list;
+    BlockType type;
+    struct Block_tag *outer_block;
+    StatementList *statement_list;
+    DeclarationList *declaration_list;
     union {
-        StatementBlockInfo      statement;
-        FunctionBlockInfo       function;
+        StatementBlockInfo statement;
+        FunctionBlockInfo function;
     } parent;
 } Block;
 
 typedef struct Elsif_tag {
-    Expression  *condition;
-    Block       *block;
-    struct Elsif_tag    *next;
+    Expression *condition;
+    Block *block;
+    struct Elsif_tag *next;
 } Elsif;
 
 typedef struct {
-    Expression  *condition;
-    Block       *then_block;
-    Elsif       *elsif_list;
-    Block       *else_block;
+    Expression *condition;
+    Block *then_block;
+    Elsif *elsif_list;
+    Block *else_block;
 } IfStatement;
 
 typedef struct {
-    char        *label;
-    Expression  *condition;
-    Block       *block;
+    char *label;
+    Expression *condition;
+    Block *block;
 } WhileStatement;
 
 typedef struct {
-    char        *label;
-    Expression  *init;
-    Expression  *condition;
-    Expression  *post;
-    Block       *block;
+    char *label;
+    Expression *init;
+    Expression *condition;
+    Expression *post;
+    Block *block;
 } ForStatement;
 
 typedef struct {
-    char        *label;
-    char        *variable;
-    Expression  *collection;
-    Block       *block;
+    char *label;
+    char *variable;
+    Expression *collection;
+    Block *block;
 } ForeachStatement;
 
-typedef struct {
-    Expression *return_value;
-} ReturnStatement;
+typedef struct { Expression *return_value; } ReturnStatement;
+
+typedef struct { char *label; } BreakStatement;
+
+typedef struct { char *label; } ContinueStatement;
 
 typedef struct {
-    char        *label;
-} BreakStatement;
-
-typedef struct {
-    char        *label;
-} ContinueStatement;
-
-typedef struct {
-    Block       *try_block;
-    Block       *catch_block;
-    char        *exception;
-    Block       *finally_block;
+    Block *try_block;
+    Block *catch_block;
+    char *exception;
+    Block *finally_block;
 } TryStatement;
 
-typedef struct {
-    Expression  *exception;
-} ThrowStatement;
+typedef struct { Expression *exception; } ThrowStatement;
 
 typedef enum {
     EXPRESSION_STATEMENT = 1,
@@ -352,55 +337,49 @@ typedef enum {
 } StatementType;
 
 struct Statement_tag {
-    StatementType       type;
-    int                 line_number;
+    StatementType type;
+    int line_number;
     union {
-        Expression      *expression_s;
-        IfStatement     if_s;
-        WhileStatement  while_s;
-        ForStatement    for_s;
-        ForeachStatement        foreach_s;
-        BreakStatement  break_s;
-        ContinueStatement       continue_s;
+        Expression *expression_s;
+        IfStatement if_s;
+        WhileStatement while_s;
+        ForStatement for_s;
+        ForeachStatement foreach_s;
+        BreakStatement break_s;
+        ContinueStatement continue_s;
         ReturnStatement return_s;
-        TryStatement    try_s;
-        ThrowStatement  throw_s;
-        Declaration     *declaration_s;
+        TryStatement try_s;
+        ThrowStatement throw_s;
+        Declaration *declaration_s;
     } u;
 };
 
 struct FunctionDefinition_tag {
-    TypeSpecifier       *type;
-    char                *name;
-    ParameterList       *parameter;
-    Block               *block;
-    int                 local_variable_count;
-    Declaration         **local_variable;
-    int                 index;
-    struct FunctionDefinition_tag       *next;
+    TypeSpecifier *type;
+    char *name;
+    ParameterList *parameter;
+    Block *block;
+    int local_variable_count;
+    Declaration **local_variable;
+    int index;
+    struct FunctionDefinition_tag *next;
 };
 
-typedef enum {
-    EUC_ENCODING = 1,
-    SHIFT_JIS_ENCODING,
-    UTF_8_ENCODING
-} Encoding;
+typedef enum { EUC_ENCODING = 1, SHIFT_JIS_ENCODING, UTF_8_ENCODING } Encoding;
 
 struct DKC_Compiler_tag {
-    MEM_Storage         compile_storage;
-    FunctionDefinition  *function_list;
-    int                 function_count;
-    DeclarationList     *declaration_list;
-    StatementList       *statement_list;
-    int                 current_line_number;
-    Block               *current_block;
-    DKC_InputMode       input_mode;
-    Encoding            source_encoding;
+    MEM_Storage compile_storage;
+    FunctionDefinition *function_list;
+    int function_count;
+    DeclarationList *declaration_list;
+    StatementList *statement_list;
+    int current_line_number;
+    Block *current_block;
+    DKC_InputMode input_mode;
+    Encoding source_encoding;
 };
 
-typedef struct {
-    DVM_Char    *string;
-} VString;
+typedef struct { DVM_Char *string; } VString;
 
 /* diksam.l */
 void dkc_set_source_string(char **source);
@@ -412,8 +391,8 @@ Declaration *dkc_alloc_declaration(TypeSpecifier *type, char *identifier);
 void dkc_function_define(DVM_BasicType type, char *identifier,
                          ParameterList *parameter_list, Block *block);
 ParameterList *dkc_create_parameter(DVM_BasicType type, char *identifier);
-ParameterList *dkc_chain_parameter(ParameterList *list,
-                                   DVM_BasicType type, char *identifier);
+ParameterList *dkc_chain_parameter(ParameterList *list, DVM_BasicType type,
+                                   char *identifier);
 ArgumentList *dkc_create_argument_list(Expression *expression);
 ArgumentList *dkc_chain_argument_list(ArgumentList *list, Expression *expr);
 StatementList *dkc_create_statement_list(Statement *statement);
@@ -425,8 +404,7 @@ Expression *dkc_create_assign_expression(Expression *left,
                                          AssignmentOperator operator,
                                          Expression *operand);
 Expression *dkc_create_binary_expression(ExpressionKind operator,
-                                         Expression *left,
-                                         Expression *right);
+                                         Expression *left, Expression *right);
 Expression *dkc_create_minus_expression(Expression *operand);
 Expression *dkc_create_logical_not_expression(Expression *operand);
 Expression *dkc_create_index_expression(Expression *array, Expression *index);
@@ -439,28 +417,25 @@ Expression *dkc_create_member_expression(Expression *expression,
                                          char *member_name);
 Expression *dkc_create_boolean_expression(DVM_Boolean value);
 Expression *dkc_create_null_expression(void);
-Statement *dkc_create_if_statement(Expression *condition,
-                                   Block *then_block, Elsif *elsif_list,
-                                   Block *else_block);
+Statement *dkc_create_if_statement(Expression *condition, Block *then_block,
+                                   Elsif *elsif_list, Block *else_block);
 Elsif *dkc_chain_elsif_list(Elsif *list, Elsif *add);
 Elsif *dkc_create_elsif(Expression *expr, Block *block);
-Statement *dkc_create_while_statement(char *label,
-                                      Expression *condition, Block *block);
-Statement *
-dkc_create_foreach_statement(char *label, char *variable,
-                             Expression *collection, Block *block);
-Statement *dkc_create_for_statement(char *label,
-                                    Expression *init, Expression *cond,
-                                    Expression *post, Block *block);
-Block * dkc_open_block(void);
+Statement *dkc_create_while_statement(char *label, Expression *condition,
+                                      Block *block);
+Statement *dkc_create_foreach_statement(char *label, char *variable,
+                                        Expression *collection, Block *block);
+Statement *dkc_create_for_statement(char *label, Expression *init,
+                                    Expression *cond, Expression *post,
+                                    Block *block);
+Block *dkc_open_block(void);
 Block *dkc_close_block(Block *block, StatementList *statement_list);
 Statement *dkc_create_expression_statement(Expression *expression);
 Statement *dkc_create_return_statement(Expression *expression);
 Statement *dkc_create_break_statement(char *label);
 Statement *dkc_create_continue_statement(char *label);
 Statement *dkc_create_try_statement(Block *try_block, char *exception,
-                                    Block *catch_block,
-                                    Block *finally_block);
+                                    Block *catch_block, Block *finally_block);
 Statement *dkc_create_throw_statement(Expression *expression);
 Statement *dkc_create_declaration_statement(DVM_BasicType type,
                                             char *identifier,

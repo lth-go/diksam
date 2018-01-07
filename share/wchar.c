@@ -1,50 +1,30 @@
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <wchar.h>
-#include <limits.h>
 #include "DBG.h"
-#include "MEM.h"
 #include "DVM.h"
+#include "MEM.h"
 
-size_t
-dvm_wcslen(wchar_t *str)
-{
-    return wcslen(str);
-}
+size_t dvm_wcslen(wchar_t *str) { return wcslen(str); }
 
-wchar_t *
-dvm_wcscpy(wchar_t *dest, wchar_t *src)
-{
-    return wcscpy(dest, src);
-}
+wchar_t *dvm_wcscpy(wchar_t *dest, wchar_t *src) { return wcscpy(dest, src); }
 
-wchar_t *
-dvm_wcsncpy(wchar_t *dest, wchar_t *src, size_t n)
-{
+wchar_t *dvm_wcsncpy(wchar_t *dest, wchar_t *src, size_t n) {
     return wcsncpy(dest, src, n);
 }
 
-int
-dvm_wcscmp(wchar_t *s1, wchar_t *s2)
-{
-    return wcscmp(s1, s2);
-}
+int dvm_wcscmp(wchar_t *s1, wchar_t *s2) { return wcscmp(s1, s2); }
 
-wchar_t *
-dvm_wcscat(wchar_t *s1, wchar_t *s2)
-{
-    return wcscat(s1, s2);
-}
+wchar_t *dvm_wcscat(wchar_t *s1, wchar_t *s2) { return wcscat(s1, s2); }
 
-int
-dvm_mbstowcs_len(const char *src)
-{
+int dvm_mbstowcs_len(const char *src) {
     int src_idx, dest_idx;
     int status;
     mbstate_t ps;
 
     memset(&ps, 0, sizeof(mbstate_t));
-    for (src_idx = dest_idx = 0; src[src_idx] != '\0'; ) {
+    for (src_idx = dest_idx = 0; src[src_idx] != '\0';) {
         status = mbrtowc(NULL, &src[src_idx], MB_LEN_MAX, &ps);
         if (status < 0) {
             return status;
@@ -56,33 +36,28 @@ dvm_mbstowcs_len(const char *src)
     return dest_idx;
 }
 
-void
-dvm_mbstowcs(const char *src, wchar_t *dest)
-{
+void dvm_mbstowcs(const char *src, wchar_t *dest) {
     int src_idx, dest_idx;
     int status;
     mbstate_t ps;
 
     memset(&ps, 0, sizeof(mbstate_t));
-    for (src_idx = dest_idx = 0; src[src_idx] != '\0'; ) {
-        status = mbrtowc(&dest[dest_idx], &src[src_idx],
-                         MB_LEN_MAX, &ps);
+    for (src_idx = dest_idx = 0; src[src_idx] != '\0';) {
+        status = mbrtowc(&dest[dest_idx], &src[src_idx], MB_LEN_MAX, &ps);
         dest_idx++;
         src_idx += status;
     }
     dest[dest_idx] = L'\0';
 }
 
-int
-dvm_wcstombs_len(const wchar_t *src)
-{
+int dvm_wcstombs_len(const wchar_t *src) {
     int src_idx, dest_idx;
     int status;
     char dummy[MB_LEN_MAX];
     mbstate_t ps;
 
     memset(&ps, 0, sizeof(mbstate_t));
-    for (src_idx = dest_idx = 0; src[src_idx] != L'\0'; ) {
+    for (src_idx = dest_idx = 0; src[src_idx] != L'\0';) {
         status = wcrtomb(dummy, src[src_idx], &ps);
         src_idx++;
         dest_idx += status;
@@ -91,15 +66,13 @@ dvm_wcstombs_len(const wchar_t *src)
     return dest_idx;
 }
 
-void
-dvm_wcstombs(const wchar_t *src, char *dest)
-{
+void dvm_wcstombs(const wchar_t *src, char *dest) {
     int src_idx, dest_idx;
     int status;
     mbstate_t ps;
 
     memset(&ps, 0, sizeof(mbstate_t));
-    for (src_idx = dest_idx = 0; src[src_idx] != '\0'; ) {
+    for (src_idx = dest_idx = 0; src[src_idx] != '\0';) {
         status = wcrtomb(&dest[dest_idx], src[src_idx], &ps);
         src_idx++;
         dest_idx += status;
@@ -107,9 +80,7 @@ dvm_wcstombs(const wchar_t *src, char *dest)
     dest[dest_idx] = '\0';
 }
 
-char *
-dvm_wcstombs_alloc(const wchar_t *src)
-{
+char *dvm_wcstombs_alloc(const wchar_t *src) {
     int len;
     char *ret;
 
@@ -120,9 +91,7 @@ dvm_wcstombs_alloc(const wchar_t *src)
     return ret;
 }
 
-char
-dvm_wctochar(wchar_t src)
-{
+char dvm_wctochar(wchar_t src) {
     mbstate_t ps;
     int status;
     char dest;
@@ -134,9 +103,7 @@ dvm_wctochar(wchar_t src)
     return dest;
 }
 
-int
-dvm_print_wcs(FILE *fp, wchar_t *str)
-{
+int dvm_print_wcs(FILE *fp, wchar_t *str) {
     char *tmp;
     int mb_len;
     int result;
@@ -150,10 +117,7 @@ dvm_print_wcs(FILE *fp, wchar_t *str)
     return result;
 }
 
-
-int
-dvm_print_wcs_ln(FILE *fp, wchar_t *str)
-{
+int dvm_print_wcs_ln(FILE *fp, wchar_t *str) {
     int result;
 
     result = dvm_print_wcs(fp, str);
@@ -162,8 +126,4 @@ dvm_print_wcs_ln(FILE *fp, wchar_t *str)
     return result;
 }
 
-DVM_Boolean
-dvm_iswdigit(wchar_t ch)
-{
-    return ch >= L'0' && ch <= L'9';
-}
+DVM_Boolean dvm_iswdigit(wchar_t ch) { return ch >= L'0' && ch <= L'9'; }

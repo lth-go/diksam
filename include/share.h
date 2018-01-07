@@ -3,9 +3,9 @@
 #include "DVM_code.h"
 
 typedef struct {
-    char        *mnemonic;
-    char        *parameter;
-    int         stack_increment;
+    char *mnemonic;
+    char *parameter;
+    int stack_increment;
 } OpcodeInfo;
 
 /* dispose.c */
@@ -28,5 +28,4 @@ DVM_Boolean dvm_iswdigit(wchar_t ch);
 /* disassemble.c */
 void dvm_disassemble(DVM_Executable *exe);
 
-#endif  /* PRIVATE_SHARE_H_INCLUDED */
-
+#endif /* PRIVATE_SHARE_H_INCLUDED */

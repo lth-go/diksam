@@ -1,17 +1,14 @@
-#include "MEM.h"
 #include "DBG.h"
+#include "MEM.h"
 #define GLOBAL_VARIABLE_DEFINE
 #include "diksamc.h"
 
-DKC_Compiler *
-DKC_create_compiler(void)
-{
+DKC_Compiler *DKC_create_compiler(void) {
     MEM_Storage storage;
     DKC_Compiler *compiler;
 
     storage = MEM_open_storage(0);
-    compiler = MEM_storage_malloc(storage,
-                                  sizeof(struct DKC_Compiler_tag));
+    compiler = MEM_storage_malloc(storage, sizeof(struct DKC_Compiler_tag));
     compiler->compile_storage = storage;
     compiler->function_list = NULL;
     compiler->function_count = 0;
@@ -39,17 +36,20 @@ DKC_create_compiler(void)
     return compiler;
 }
 
-static DVM_Executable *do_compile(DKC_Compiler *compiler)
-{
+static DVM_Executable *do_compile(DKC_Compiler *compiler) {
     extern int yyparse(void);
     DVM_Executable *exe;
 
     dkc_set_current_compiler(compiler);
+
+    // 生成分析树
     if (yyparse()) {
         fprintf(stderr, "Error ! Error ! Error !\n");
         exit(1);
     }
+    // 修正树
     dkc_fix_tree(compiler);
+    // 生成字节码
     exe = dkc_generate(compiler);
 
     /*
@@ -59,9 +59,7 @@ static DVM_Executable *do_compile(DKC_Compiler *compiler)
     return exe;
 }
 
-DVM_Executable *
-DKC_compile(DKC_Compiler *compiler, FILE *fp)
-{
+DVM_Executable *DKC_compile(DKC_Compiler *compiler, FILE *fp) {
     extern FILE *yyin;
     DVM_Executable *exe;
 
@@ -77,9 +75,7 @@ DKC_compile(DKC_Compiler *compiler, FILE *fp)
     return exe;
 }
 
-DVM_Executable *
-DKC_compile_string(DKC_Compiler *compiler, char **lines)
-{
+DVM_Executable *DKC_compile_string(DKC_Compiler *compiler, char **lines) {
     extern int yyparse(void);
     DVM_Executable *exe;
 
@@ -94,9 +90,7 @@ DKC_compile_string(DKC_Compiler *compiler, char **lines)
     return exe;
 }
 
-void
-DKC_dispose_compiler(DKC_Compiler *compiler)
-{
+void DKC_dispose_compiler(DKC_Compiler *compiler) {
     FunctionDefinition *fd_pos;
 
     for (fd_pos = compiler->function_list; fd_pos; fd_pos = fd_pos->next) {

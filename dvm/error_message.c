@@ -1,10 +1,8 @@
 #include <string.h>
 #include "dvm_pri.h"
 
-ErrorDefinition dvm_error_message_format[] = {
-    {"dummy"},
-    {"²»ÕıÈ·µÄ¶à×Ö½Ú×Ö·û¡£"},
-    {"ÕÒ²»µ½º¯Êı$(name)¡£"},
-    {"ÖØ¸´¶¨Òåº¯Êı$(name)¡£"},
-    {"dummy"}
-};
+ErrorDefinition dvm_error_message_format[] = {{"dummy"},
+                                              {"ä¸æ­£ç¡®çš„å¤šå­—èŠ‚å­—ç¬¦ã€‚"},
+                                              {"æ‰¾ä¸åˆ°å‡½æ•°$(name)ã€‚"},
+                                              {"é‡å¤å®šä¹‰å‡½æ•°$(name)ã€‚"},
+                                              {"dummy"}};

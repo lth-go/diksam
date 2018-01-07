@@ -1,12 +1,10 @@
-#include <stdio.h>
 #include <locale.h>
+#include <stdio.h>
 #include "DKC.h"
 #include "DVM.h"
 #include "MEM.h"
 
-int
-main(int argc, char **argv)
-{
+int main(int argc, char **argv) {
     DKC_Compiler *compiler;
     FILE *fp;
     DVM_Executable *exe;
@@ -24,11 +22,17 @@ main(int argc, char **argv)
     }
 
     setlocale(LC_CTYPE, "");
+    // 编译器
     compiler = DKC_create_compiler();
+    // 生成字节码
     exe = DKC_compile(compiler, fp);
+    // 虚拟机
     dvm = DVM_create_virtual_machine();
-    DVM_add_executable(dvm,exe);
+    DVM_add_executable(dvm, exe);
+    // 虚拟机执行字节码
     DVM_execute(dvm);
+
+    // 退出
     DKC_dispose_compiler(compiler);
     DVM_dispose_virtual_machine(dvm);
 

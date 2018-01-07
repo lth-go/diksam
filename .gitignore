@@ -1,0 +1,10 @@
+*.o
+
+/compiler/diksam
+
+/compiler/lex.yy.c
+/compiler/lex.yy.o
+/compiler/y.output
+/compiler/y.tab.c
+/compiler/y.tab.h
+/compiler/y.tab.o

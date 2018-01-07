@@ -14,32 +14,29 @@ typedef enum {
 typedef struct DVM_TypeSpecifier_tag DVM_TypeSpecifier;
 
 typedef struct {
-    char                *name;
-    DVM_TypeSpecifier   *type;
+    char *name;
+    DVM_TypeSpecifier *type;
 } DVM_LocalVariable;
 
-typedef enum {
-    DVM_FUNCTION_DERIVE
-} DVM_DeriveTag;
+typedef enum { DVM_FUNCTION_DERIVE } DVM_DeriveTag;
 
 typedef struct {
-    int                 parameter_count;
-    DVM_LocalVariable   *parameter;
+    int parameter_count;
+    DVM_LocalVariable *parameter;
 } DVM_FunctionDerive;
 
 typedef struct DVM_TypeDerive_tag {
-    DVM_DeriveTag       tag;
+    DVM_DeriveTag tag;
     union {
-        DVM_FunctionDerive      function_d;
+        DVM_FunctionDerive function_d;
     } u;
 } DVM_TypeDerive;
 
 struct DVM_TypeSpecifier_tag {
-    DVM_BasicType       basic_type;
-    int                 derive_count;
-    DVM_TypeDerive      *derive;
+    DVM_BasicType basic_type;
+    int derive_count;
+    DVM_TypeDerive *derive;
 };
-
 
 typedef wchar_t DVM_Char;
 typedef unsigned char DVM_Byte;
@@ -128,15 +125,15 @@ typedef enum {
 typedef struct {
     DVM_ConstantPoolTag tag;
     union {
-        int     c_int;
-        double  c_double;
+        int c_int;
+        double c_double;
         DVM_Char *c_string;
     } u;
 } DVM_ConstantPool;
 
 typedef struct {
-    char                *name;
-    DVM_TypeSpecifier   *type;
+    char *name;
+    DVM_TypeSpecifier *type;
 } DVM_Variable;
 
 typedef struct {
@@ -146,32 +143,32 @@ typedef struct {
 } DVM_LineNumber;
 
 typedef struct {
-    DVM_TypeSpecifier   *type;
-    char                *name;
-    int                 parameter_count;
-    DVM_LocalVariable   *parameter;
-    DVM_Boolean         is_implemented;
-    int                 local_variable_count;
-    DVM_LocalVariable   *local_variable;
-    int                 code_size;
-    DVM_Byte            *code;
-    int                 line_number_size;
-    DVM_LineNumber      *line_number;
-    int                 need_stack_size;
+    DVM_TypeSpecifier *type;
+    char *name;
+    int parameter_count;
+    DVM_LocalVariable *parameter;
+    DVM_Boolean is_implemented;
+    int local_variable_count;
+    DVM_LocalVariable *local_variable;
+    int code_size;
+    DVM_Byte *code;
+    int line_number_size;
+    DVM_LineNumber *line_number;
+    int need_stack_size;
 } DVM_Function;
 
 struct DVM_Excecutable_tag {
-    int                 constant_pool_count;
-    DVM_ConstantPool    *constant_pool;
-    int                 global_variable_count;
-    DVM_Variable        *global_variable;
-    int                 function_count;
-    DVM_Function        *function;
-    int                 code_size;
-    DVM_Byte            *code;
-    int                 line_number_size;
-    DVM_LineNumber      *line_number;
-    int                 need_stack_size;
+    int constant_pool_count;
+    DVM_ConstantPool *constant_pool;
+    int global_variable_count;
+    DVM_Variable *global_variable;
+    int function_count;
+    DVM_Function *function;
+    int code_size;
+    DVM_Byte *code;
+    int line_number_size;
+    DVM_LineNumber *line_number;
+    int need_stack_size;
 };
 
 #endif /* PUBLIC_DVM_CODE_H_INCLUDED */

@@ -7,9 +7,7 @@
 #include "diksamc.h"
 #include "y.tab.h"
 
-static int
-file_input(char *buf, int max_size)
-{
+static int file_input(char *buf, int max_size) {
     int ch;
     int len;
 
@@ -28,25 +26,20 @@ file_input(char *buf, int max_size)
 static char **st_source_string;
 static int st_current_source_line;
 static int st_current_char_index;
- 
-void
-dkc_set_source_string(char **source)
-{
+
+void dkc_set_source_string(char **source) {
     st_source_string = source;
     st_current_source_line = 0;
     st_current_char_index = 0;
 }
 
-static int
-string_input(char *buf, int max_size)
-{
+static int string_input(char *buf, int max_size) {
     int len;
 
     if (st_source_string[st_current_source_line] == NULL)
         return 0;
 
-    if (st_source_string[st_current_source_line][st_current_char_index]
-        == '\0') {
+    if (st_source_string[st_current_source_line][st_current_char_index] == '\0') {
         st_current_source_line++;
         st_current_char_index = 0;
     }
@@ -54,8 +47,7 @@ string_input(char *buf, int max_size)
     if (st_source_string[st_current_source_line] == NULL)
         return 0;
 
-    len = smaller(strlen(st_source_string[st_current_source_line])
-                  - st_current_char_index,
+    len = smaller(strlen(st_source_string[st_current_source_line]) - st_current_char_index,
                   max_size);
     strncpy(buf,
             &st_source_string[st_current_source_line][st_current_char_index],
@@ -65,9 +57,7 @@ string_input(char *buf, int max_size)
     return len;
 }
 
-static int
-my_yyinput(char *buf, int max_size)
-{
+static int my_yyinput(char *buf, int max_size) {
     int result;
 
     switch (dkc_get_current_compiler()->input_mode) {
@@ -86,15 +76,11 @@ my_yyinput(char *buf, int max_size)
 }
 
 
-int
-yywrap(void)
-{
+int yywrap(void) {
     return 1;
 }
 
-static void
-increment_line_number(void)
-{
+static void increment_line_number(void) {
     dkc_get_current_compiler()->current_line_number++;
 }
 %}

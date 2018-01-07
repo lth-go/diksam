@@ -4,8 +4,8 @@
 #include "DBG.h"
 
 struct DBG_Controller_tag {
-    FILE        *debug_write_fp;
-    int         current_debug_level;
+    FILE *debug_write_fp;
+    int current_debug_level;
 };
 
 #endif /* PRIVATE_DBG_H_INCLUDED */
