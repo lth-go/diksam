@@ -10,9 +10,9 @@ dump_constant_pool(int constant_pool_count, DVM_ConstantPool *constant_pool)
 {
     int i;
 
-    printf("** constant pool ********************\n");
+    printf("** constant pool section ***********************************\n");
     for (i = 0; i < constant_pool_count; i++) {
-        printf("[%d]", i);
+        printf("%05d:", i);
         switch (constant_pool[i].tag) {
         case DVM_CONSTANT_INT:
             printf("int %d\n", constant_pool[i].u.c_int);
@@ -66,6 +66,7 @@ dump_type(DVM_TypeSpecifier *type)
     case DVM_STRING_TYPE:
         printf("string ");
         break;
+    case DVM_NULL_TYPE: /* FALLTHRU */
     default:
         DBG_assert(0, ("basic_type..%d\n", type->basic_type));
     }
@@ -75,6 +76,9 @@ dump_type(DVM_TypeSpecifier *type)
         case DVM_FUNCTION_DERIVE:
             dump_parameter_list(type->derive[i].u.function_d.parameter_count,
                                 type->derive[i].u.function_d.parameter);
+            break;
+        case DVM_ARRAY_DERIVE:
+            printf("[]");
             break;
         default:
             DBG_assert(0, ("derive_tag..%d\n", type->derive->tag));
@@ -87,8 +91,9 @@ dump_variable(int global_variable_count, DVM_Variable *global_variable)
 {
     int i;
 
-    printf("** global variable ********************\n");
+    printf("** global variable section *********************************\n");
     for (i = 0; i < global_variable_count; i++) {
+        printf("%5d:", i);
         dump_type(global_variable[i].type);
         printf(" %s\n", global_variable[i].name);
     }
@@ -128,18 +133,52 @@ dump_opcode(int code_size, DVM_Byte *code)
 }
 
 static void
+dump_line_number(int line_number_size, DVM_LineNumber *line_number)
+{
+    int i;
+
+    printf("*** line number ***\n");
+    for (i = 0; i < line_number_size; i++) {
+        printf("%5d: from %5d size %5d\n",
+               line_number[i].line_number,
+               line_number[i].start_pc,
+               line_number[i].pc_count);
+    }
+}
+
+static void
 dump_function(int function_count, DVM_Function *function)
 {
     int i;
 
-    printf("** function ********************\n");
+    printf("** function section ****************************************\n");
     for (i = 0; i < function_count; i++) {
+        printf("*** [%d] %s ***\n", i, function[i].name);
+
         dump_type(function[i].type);
         printf(" %s ", function[i].name);
         dump_parameter_list(function[i].parameter_count,
                             function[i].parameter);
         printf("\n");
-        dump_opcode(function[i].code_size, function[i].code);
+        if (function[i].code_size > 0) {
+            dump_opcode(function[i].code_size, function[i].code);
+            dump_line_number(function[i].line_number_size,
+                             function[i].line_number);
+        }
+        printf("*** end of %s ***\n", function[i].name);
+    }
+}
+
+static void
+dump_types(int type_count, DVM_TypeSpecifier *types)
+{
+    int i;
+
+    printf("** type section ********************************************\n");
+    for (i = 0; i < type_count; i++) {
+        printf("%5d:", i);
+        dump_type(&types[i]);
+        printf("\n");
     }
 }
 
@@ -149,6 +188,8 @@ dvm_disassemble(DVM_Executable *exe)
     dump_constant_pool(exe->constant_pool_count, exe->constant_pool);
     dump_variable(exe->global_variable_count, exe->global_variable);
     dump_function(exe->function_count, exe->function);
+    dump_types(exe->type_specifier_count, exe->type_specifier);
     printf("** toplevel ********************\n");
     dump_opcode(exe->code_size, exe->code);
+    dump_line_number(exe->line_number_size, exe->line_number);
 }

@@ -73,8 +73,7 @@ search_argument(MessageArgument *arg_list,
 }
 
 static void
-format_message(DVM_Executable *exe, Function *func, int pc,
-               ErrorDefinition *format, VString *v,
+format_message(ErrorDefinition *format, VString *v,
                va_list ap)
 {
     int         i;
@@ -88,7 +87,7 @@ format_message(DVM_Executable *exe, Function *func, int pc,
 
     create_message_argument(arg, ap);
 
-    wc_format = dvm_mbstowcs_alloc(exe, func, pc, format->format);
+    wc_format = dvm_mbstowcs_alloc(NULL, format->format);
     DBG_assert(wc_format != NULL, ("wc_format is null.\n"));
     
     for (i = 0; wc_format[i] != L'\0'; i++) {
@@ -194,8 +193,7 @@ dvm_error(DVM_Executable *exe, Function *func, int pc, RuntimeError id, ...)
     va_start(ap, id);
 
     dvm_vstr_clear(&message);
-    format_message(exe, func, pc,
-                   &dvm_error_message_format[id],
+    format_message(&dvm_error_message_format[id],
                    &message, ap);
 
     if (pc != NO_LINE_NUMBER_PC) {

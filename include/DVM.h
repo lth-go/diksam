@@ -16,6 +16,7 @@ typedef union {
     int         int_value;
     double      double_value;
     DVM_Object  *object;
+    int         function_index;
 } DVM_Value;
 
 DVM_VirtualMachine *DVM_create_virtual_machine(void);

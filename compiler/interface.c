@@ -51,10 +51,9 @@ static DVM_Executable *do_compile(DKC_Compiler *compiler)
     }
     dkc_fix_tree(compiler);
     exe = dkc_generate(compiler);
-
-    /*
+/*
     dvm_disassemble(exe);
-    */
+*/
 
     return exe;
 }

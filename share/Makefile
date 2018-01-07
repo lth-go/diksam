@@ -1,6 +1,7 @@
 TARGET = share.o
 CC=gcc
-CFLAGS = -c -g -Wall -Wswitch-enum -ansi -pedantic -DDEBUG ../include
+CFLAGS = -c -g -Wall -Wswitch-enum -ansi -pedantic -DDEBUG -I../include
+
 OBJS = dispose.o \
   opcode.o \
   disassemble.o \

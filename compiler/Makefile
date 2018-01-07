@@ -57,6 +57,8 @@ lex.yy.o: lex.yy.c diksamc.h ../include/MEM.h
 create.o: create.c ../include/MEM.h ../include/DBG.h diksamc.h \
  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
  ../include/share.h
+diksam.tab.o: diksam.tab.c diksamc.h ../include/MEM.h ../include/DKC.h \
+ ../include/DVM_code.h ../include/DVM.h ../include/share.h
 error.o: error.c ../include/MEM.h ../include/DBG.h diksamc.h \
  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
  ../include/share.h

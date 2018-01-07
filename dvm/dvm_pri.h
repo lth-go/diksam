@@ -6,6 +6,7 @@
 
 #define STACK_ALLOC_SIZE (4096)
 #define HEAP_THRESHOLD_SIZE     (1024 * 256)
+#define NULL_STRING (L"null")
 #define TRUE_STRING (L"true")
 #define FALSE_STRING (L"false")
 
@@ -13,6 +14,7 @@
 
 #define MESSAGE_ARGUMENT_MAX    (256)
 #define LINE_BUF_SIZE (1024)
+
 
 #define GET_2BYTE_INT(p) (((p)[0] << 8) + (p)[1])
 #define SET_2BYTE_INT(p, value) \
@@ -35,6 +37,9 @@ typedef enum {
     BAD_MULTIBYTE_CHARACTER_ERR = 1,
     FUNCTION_NOT_FOUND_ERR,
     FUNCTION_MULTIPLE_DEFINE_ERR,
+    INDEX_OUT_OF_BOUNDS_ERR,
+    DIVISION_BY_ZERO_ERR,
+    NULL_POINTER_ERR,
     RUNTIME_ERROR_COUNT_PLUS_1
 } RuntimeError;
 
@@ -90,6 +95,7 @@ typedef struct {
 
 typedef enum {
     STRING_OBJECT = 1,
+    ARRAY_OBJECT,
     OBJECT_TYPE_COUNT_PLUS_1
 } ObjectType;
 
@@ -98,11 +104,29 @@ struct DVM_String_tag {
     DVM_Char    *string;
 };
 
+typedef enum {
+    INT_ARRAY = 1,
+    DOUBLE_ARRAY,
+    OBJECT_ARRAY
+} ArrayType;
+
+struct DVM_Array_tag {
+    ArrayType   type;
+    int         size;
+    int         alloc_size;
+    union {
+        int             *int_array;
+        double          *double_array;
+        DVM_Object      **object;
+    } u;
+};
+
 struct DVM_Object_tag {
     ObjectType  type;
     unsigned int        marked:1;
     union {
         DVM_String      string;
+        DVM_Array       array;
     } u;
     struct DVM_Object_tag *prev;
     struct DVM_Object_tag *next;
@@ -123,6 +147,8 @@ struct DVM_VirtualMachine_tag {
     Stack       stack;
     Heap        heap;
     Static      static_v;
+    DVM_Executable      *current_executable;
+    Function    *current_function;
     int         pc;
     Function    *function;
     int         function_count;
@@ -134,18 +160,18 @@ DVM_Object *
 dvm_literal_to_dvm_string_i(DVM_VirtualMachine *inter, DVM_Char *str);
 DVM_Object *
 dvm_create_dvm_string_i(DVM_VirtualMachine *dvm, DVM_Char *str);
+DVM_Object *dvm_create_array_int_i(DVM_VirtualMachine *dvm, int size);
+DVM_Object *dvm_create_array_double_i(DVM_VirtualMachine *dvm, int size);
+DVM_Object *dvm_create_array_object_i(DVM_VirtualMachine *dvm, int size);
 void dvm_garbage_collect(DVM_VirtualMachine *dvm);
 /* native.c */
 void dvm_add_native_functions(DVM_VirtualMachine *dvm);
-/* wchar.c */
-wchar_t *dvm_mbstowcs_alloc(DVM_Executable *exe, Function *func, int pc,
-                            const char *src);
 /* util.c */
 void dvm_vstr_clear(VString *v);
 void dvm_vstr_append_string(VString *v, DVM_Char *str);
 void dvm_vstr_append_character(VString *v, DVM_Char ch);
 /* error.c */
-void
-dvm_error(DVM_Executable *exe, Function *func, int pc, RuntimeError id, ...);
+void dvm_error(DVM_Executable *exe, Function *func,
+               int pc, RuntimeError id, ...);
 
 #endif /* DVM_PRI_H_INCLUDED */

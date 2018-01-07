@@ -20,6 +20,7 @@ DVM_create_virtual_machine(void)
     dvm->heap.current_heap_size = 0;
     dvm->heap.header = NULL;
     dvm->heap.current_threshold = HEAP_THRESHOLD_SIZE;
+    dvm->current_executable = NULL;
     dvm->function = NULL;
     dvm->function_count = 0;
     dvm->executable = NULL;
@@ -95,8 +96,7 @@ search_function(DVM_VirtualMachine *dvm, char *name)
             return i;
         }
     }
-    dvm_error(NULL, NULL, NO_LINE_NUMBER_PC,
-              FUNCTION_NOT_FOUND_ERR,
+    dvm_error(NULL, NULL, NO_LINE_NUMBER_PC, FUNCTION_NOT_FOUND_ERR,
               STRING_MESSAGE_ARGUMENT, "name", name,
               MESSAGE_ARGUMENT_END);
     return 0; /* make compiler happy */
@@ -115,10 +115,10 @@ convert_code(DVM_VirtualMachine *dvm, DVM_Executable *exe,
     for (i = 0; i < code_size; i++) {
         if (code[i] == DVM_PUSH_STACK_INT
             || code[i] == DVM_PUSH_STACK_DOUBLE
-            || code[i] == DVM_PUSH_STACK_STRING
+            || code[i] == DVM_PUSH_STACK_OBJECT
             || code[i] == DVM_POP_STACK_INT
             || code[i] == DVM_POP_STACK_DOUBLE
-            || code[i] == DVM_POP_STACK_STRING) {
+            || code[i] == DVM_POP_STACK_OBJECT) {
 
             DBG_assert(func != NULL, ("func == NULL!\n"));
 
@@ -157,21 +157,30 @@ convert_code(DVM_VirtualMachine *dvm, DVM_Executable *exe,
 
 static void
 initialize_value(DVM_VirtualMachine *dvm,
-                 DVM_BasicType basic_type, DVM_Value *value)
+                 DVM_TypeSpecifier *type, DVM_Value *value)
 {
-    switch (basic_type) {
-    case DVM_BOOLEAN_TYPE: /* FALLTHRU */
-    case DVM_INT_TYPE:
-        value->int_value = 0;
-        break;
-    case DVM_DOUBLE_TYPE:
-        value->double_value = 0.0;
-        break;
-    case DVM_STRING_TYPE:
-        value->object = dvm_literal_to_dvm_string_i(dvm, L"");
-        break;
-    default:
-        DBG_assert(0, ("basic_type..%d", basic_type));
+    if (type->derive_count > 0) {
+        if (type->derive[0].tag == DVM_ARRAY_DERIVE) {
+            value->object = NULL;
+        } else {
+            DBG_assert(0, ("tag..%d", type->derive[0].tag));
+        }
+    } else {
+        switch (type->basic_type) {
+        case DVM_BOOLEAN_TYPE: /* FALLTHRU */
+        case DVM_INT_TYPE:
+            value->int_value = 0;
+            break;
+        case DVM_DOUBLE_TYPE:
+            value->double_value = 0.0;
+            break;
+        case DVM_STRING_TYPE:
+            value->object = NULL;
+            break;
+        case DVM_NULL_TYPE: /* FALLTHRU */
+        default:
+            DBG_assert(0, ("basic_type..%d", type->basic_type));
+        }
     }
 }
 
@@ -191,7 +200,7 @@ add_static_variables(DVM_VirtualMachine *dvm, DVM_Executable *exe)
     }
     for (i = 0; i < exe->global_variable_count; i++) {
         initialize_value(dvm,
-                         exe->global_variable[i].type->basic_type,
+                         exe->global_variable[i].type,
                          &dvm->static_v.variable[i]);
     }
 }
@@ -224,18 +233,29 @@ DVM_add_executable(DVM_VirtualMachine *dvm, DVM_Executable *executable)
 static DVM_Object *
 chain_string(DVM_VirtualMachine *dvm, DVM_Object *str1, DVM_Object *str2)
 {
-    int len;
-    DVM_Char    *str;
+    int result_len;
+    DVM_Char    *left;
+    DVM_Char    *right;
+    DVM_Char    *result;
     DVM_Object *ret;
 
-    len = dvm_wcslen(str1->u.string.string)
-        + dvm_wcslen(str2->u.string.string);
-    str = MEM_malloc(sizeof(DVM_Char) * (len + 1));
+    if (str1 == NULL) {
+        left = NULL_STRING;
+    } else {
+        left = str1->u.string.string;
+    }
+    if (str2 == NULL) {
+        right = NULL_STRING;
+    } else {
+        right = str2->u.string.string;
+    }
+    result_len = dvm_wcslen(left) + dvm_wcslen(right);
+    result = MEM_malloc(sizeof(DVM_Char) * (result_len + 1));
 
-    dvm_wcscpy(str, str1->u.string.string);
-    dvm_wcscat(str, str2->u.string.string);
+    dvm_wcscpy(result, left);
+    dvm_wcscat(result, right);
 
-    ret = dvm_create_dvm_string_i(dvm, str);
+    ret = dvm_create_dvm_string_i(dvm, result);
 
     return ret;
 }
@@ -276,7 +296,7 @@ initialize_local_variables(DVM_VirtualMachine *dvm,
     for (i = 0, sp_idx = from_sp; i < func->local_variable_count;
          i++, sp_idx++) {
         initialize_value(dvm,
-                         func->local_variable[i].type->basic_type,
+                         func->local_variable[i].type,
                          &dvm->stack.stack[sp_idx]);
         if (func->local_variable[i].type->basic_type == DVM_STRING_TYPE) {
             dvm->stack.pointer_flags[i] = DVM_TRUE;
@@ -342,6 +362,7 @@ invoke_diksam_function(DVM_VirtualMachine *dvm,
 
     *code_p = (*exe_p)->function[callee->u.diksam_f.index].code;
     *code_size_p = (*exe_p)->function[callee->u.diksam_f.index].code_size;
+
 }
 
 static void
@@ -416,23 +437,126 @@ return_function(DVM_VirtualMachine *dvm, Function **func_p,
   ((dvm)->stack.stack[(sp)].object = r, \
    (dvm)->stack.pointer_flags[(sp)] = DVM_TRUE)
 
+DVM_Object *
+create_array_sub(DVM_VirtualMachine *dvm, int dim, int dim_index,
+                 DVM_TypeSpecifier *type)
+{
+    DVM_Object *ret;
+    int size;
+    int i;
+
+    size = STI(dvm, -dim);
+
+    if (dim_index == type->derive_count-1) {
+        switch (type->basic_type) {
+        case DVM_BOOLEAN_TYPE: /* FALLTHRU */
+        case DVM_INT_TYPE:
+            ret = DVM_create_array_int(dvm, size);
+            break;
+        case DVM_DOUBLE_TYPE:
+            ret = DVM_create_array_double(dvm, size);
+            break;
+        case DVM_STRING_TYPE:
+            ret = DVM_create_array_object(dvm, size);
+            break;
+        case DVM_NULL_TYPE: /* FALLTHRU */
+        default:
+            DBG_assert(0, ("type->basic_type..%d\n", type->basic_type));
+            break;
+        }
+    } else if (type->derive[dim_index].tag == DVM_FUNCTION_DERIVE) {
+        /* BUGBUG */
+        ret = NULL;
+    } else {
+        ret = DVM_create_array_object(dvm, size);
+        if (dim_index < dim - 1) {
+            STO_WRITE(dvm, 0, ret);
+            dvm->stack.stack_pointer++;
+            for (i = 0; i < size; i++) {
+                DVM_Object *child;
+                child = create_array_sub(dvm, dim, dim_index+1, type);
+                DVM_array_set_object(dvm, ret, i, child);
+            }
+            dvm->stack.stack_pointer--;
+        }
+    }
+    return ret;
+}
+
+DVM_Object *
+create_array(DVM_VirtualMachine *dvm, int dim, DVM_TypeSpecifier *type)
+{
+    return create_array_sub(dvm, dim, 0, type);
+}
+
+DVM_Object *
+create_array_literal_int(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *array;
+    int i;
+
+    array = dvm_create_array_int_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        array->u.array.u.int_array[i] = STI(dvm, -size+i);
+    }
+
+    return array;
+}
+
+DVM_Object *
+create_array_literal_double(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *array;
+    int i;
+
+    array = dvm_create_array_double_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        array->u.array.u.double_array[i] = STD(dvm, -size+i);
+    }
+
+    return array;
+}
+
+DVM_Object *
+create_array_literal_object(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *array;
+    int i;
+
+    array = dvm_create_array_object_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        array->u.array.u.object[i] = STO(dvm, -size+i);
+    }
+
+    return array;
+}
+
+static void
+restore_pc(DVM_VirtualMachine *dvm, DVM_Executable *exe,
+           Function *func, int pc)
+{
+    dvm->current_executable = exe;
+    dvm->current_function = func;
+    dvm->pc = pc;
+}
+
 static DVM_Value
 execute(DVM_VirtualMachine *dvm, Function *func,
         DVM_Byte *code, int code_size)
 {
-    int         pc;
     int         base;
-    DVM_Value   ret;
-    DVM_Value   *stack;
     DVM_Executable *exe;
+    int         pc;
+    DVM_Value   ret;
 
-    stack = dvm->stack.stack;
-    exe = dvm->executable;
+    pc = dvm->pc;
+    exe = dvm->current_executable;
 
-    for (pc = dvm->pc; pc < code_size; ) {
+    while (pc < code_size) {
         /*
         fprintf(stderr, "%s  sp(%d)\t\n",
-                dvm_opcode_info[code[pc]].mnemonic, dvm->stack.stack_pointer);
+                dvm_opcode_info[code[pc]].mnemonic,
+                                dvm->stack.stack_pointer);
         */
 
         switch (code[pc]) {
@@ -448,7 +572,8 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             break;
         case DVM_PUSH_INT:
             STI_WRITE(dvm, 0,
-                      exe->constant_pool[GET_2BYTE_INT(&code[pc+1])].u.c_int);
+                      exe->constant_pool[GET_2BYTE_INT(&code[pc+1])]
+                      .u.c_int);
             dvm->stack.stack_pointer++;
             pc += 3;
             break;
@@ -473,10 +598,16 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             STO_WRITE(dvm, 0,
                       dvm_literal_to_dvm_string_i(dvm,
                                                   exe->constant_pool
-                                                  [GET_2BYTE_INT(&code[pc+1])]
+                                                  [GET_2BYTE_INT(&code
+                                                                 [pc+1])]
                                                   .u.c_string));
             dvm->stack.stack_pointer++;
             pc += 3;
+            break;
+        case DVM_PUSH_NULL:
+            STO_WRITE(dvm, 0, NULL);
+            dvm->stack.stack_pointer++;
+            pc++;
             break;
         case DVM_PUSH_STACK_INT:
             STI_WRITE(dvm, 0,
@@ -490,7 +621,7 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             dvm->stack.stack_pointer++;
             pc += 3;
             break;
-        case DVM_PUSH_STACK_STRING:
+        case DVM_PUSH_STACK_OBJECT:
             STO_WRITE(dvm, 0,
                       STO_I(dvm, base + GET_2BYTE_INT(&code[pc+1])));
             dvm->stack.stack_pointer++;
@@ -508,7 +639,7 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             dvm->stack.stack_pointer--;
             pc += 3;
             break;
-        case DVM_POP_STACK_STRING:
+        case DVM_POP_STACK_OBJECT:
             STO_WRITE_I(dvm, base + GET_2BYTE_INT(&code[pc+1]),
                         STO(dvm, -1));
             dvm->stack.stack_pointer--;
@@ -528,7 +659,7 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             dvm->stack.stack_pointer++;
             pc += 3;
             break;
-        case DVM_PUSH_STATIC_STRING:
+        case DVM_PUSH_STATIC_OBJECT:
             STO_WRITE(dvm, 0,
                       dvm->static_v.variable[GET_2BYTE_INT(&code[pc+1])]
                       .object);
@@ -542,17 +673,96 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             pc += 3;
             break;
         case DVM_POP_STATIC_DOUBLE:
-            dvm->static_v.variable[GET_2BYTE_INT(&code[pc+1])].double_value
+            dvm->static_v.variable[GET_2BYTE_INT(&code[pc+1])]
+                .double_value
                 = STD(dvm, -1);
             dvm->stack.stack_pointer--;
             pc += 3;
             break;
-        case DVM_POP_STATIC_STRING:
+        case DVM_POP_STATIC_OBJECT:
             dvm->static_v.variable[GET_2BYTE_INT(&code[pc+1])].object
                 = STO(dvm, -1);
             dvm->stack.stack_pointer--;
             pc += 3;
             break;
+        case DVM_PUSH_ARRAY_INT:
+        {
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+            int int_value;
+
+            restore_pc(dvm, exe, func, pc);
+            int_value = DVM_array_get_int(dvm, array, index);
+
+            STI_WRITE(dvm, -2, int_value);
+            dvm->stack.stack_pointer--;
+            pc++;
+            break;
+        }
+        case DVM_PUSH_ARRAY_DOUBLE:
+        {
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+            double double_value;
+
+            restore_pc(dvm, exe, func, pc);
+            double_value = DVM_array_get_double(dvm, array, index);
+
+            STD_WRITE(dvm, -2, double_value);
+            dvm->stack.stack_pointer--;
+            pc++;
+            break;
+        }
+        case DVM_PUSH_ARRAY_OBJECT:
+        {
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+            DVM_Object *object;
+
+            restore_pc(dvm, exe, func, pc);
+            object = DVM_array_get_object(dvm, array, index);
+
+            STO_WRITE(dvm, -2, object);
+            dvm->stack.stack_pointer--;
+            pc++;
+            break;
+        }
+        case DVM_POP_ARRAY_INT:
+        {
+            int value = STI(dvm, -3);
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+
+            restore_pc(dvm, exe, func, pc);
+            DVM_array_set_int(dvm, array, index, value);
+            dvm->stack.stack_pointer -= 3;
+            pc++;
+            break;
+        }
+        case DVM_POP_ARRAY_DOUBLE:
+        {
+            double value = STD(dvm, -3);
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+
+            restore_pc(dvm, exe, func, pc);
+            DVM_array_set_double(dvm, array, index, value);
+            dvm->stack.stack_pointer -= 3;
+            pc++;
+            break;
+        }
+        case DVM_POP_ARRAY_OBJECT:
+        {
+            DVM_Object *value = STO(dvm, -3);
+            DVM_Object *array = STO(dvm, -2);
+            int index = STI(dvm, -1);
+
+            restore_pc(dvm, exe, func, pc);
+            DVM_array_set_object(dvm, array, index, value);
+            dvm->stack.stack_pointer -= 3;
+            pc++;
+            break;
+        }
         case DVM_ADD_INT:
             STI(dvm, -2) = STI(dvm, -2) + STI(dvm, -1);
             dvm->stack.stack_pointer--;
@@ -591,6 +801,10 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             pc++;
             break;
         case DVM_DIV_INT:
+            if (STI(dvm, -1) == 0) {
+                dvm_error(exe, func, pc, DIVISION_BY_ZERO_ERR,
+                          MESSAGE_ARGUMENT_END);
+            }
             STI(dvm, -2) = STI(dvm, -2) / STI(dvm, -1);
             dvm->stack.stack_pointer--;
             pc++;
@@ -650,7 +864,8 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             DVM_Char *wc_str;
 
             sprintf(buf, "%d", STI(dvm, -1));
-            wc_str = dvm_mbstowcs_alloc(exe, func, pc, buf);
+            restore_pc(dvm, exe, func, pc);
+            wc_str = dvm_mbstowcs_alloc(dvm, buf);
             STO_WRITE(dvm, -1,
                       dvm_create_dvm_string_i(dvm, wc_str));
             pc++;
@@ -662,7 +877,8 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             DVM_Char *wc_str;
 
             sprintf(buf, "%f", STD(dvm, -1));
-            wc_str = dvm_mbstowcs_alloc(exe, func, pc, buf);
+            restore_pc(dvm, exe, func, pc);
+            wc_str = dvm_mbstowcs_alloc(dvm, buf);
             STO_WRITE(dvm, -1,
                       dvm_create_dvm_string_i(dvm, wc_str));
             pc++;
@@ -675,6 +891,11 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             break;
         case DVM_EQ_DOUBLE:
             STI(dvm, -2) = (STD(dvm, -2) == STD(dvm, -1));
+            dvm->stack.stack_pointer--;
+            pc++;
+            break;
+        case DVM_EQ_OBJECT:
+            STI_WRITE(dvm, -2, STO(dvm, -2) == STO(dvm, -1));
             dvm->stack.stack_pointer--;
             pc++;
             break;
@@ -763,6 +984,11 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             dvm->stack.stack_pointer--;
             pc++;
             break;
+        case DVM_NE_OBJECT:
+            STI_WRITE(dvm, -2, STO(dvm, -2) != STO(dvm, -1));
+            dvm->stack.stack_pointer--;
+            pc++;
+            break;
         case DVM_NE_STRING:
             STI_WRITE(dvm, -2,
                       dvm_wcscmp(STO(dvm, -2)->u.string.string,
@@ -789,8 +1015,8 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             pc++;
             break;
         case DVM_DUPLICATE:
-            stack[dvm->stack.stack_pointer]
-                = stack[dvm->stack.stack_pointer-1];
+            dvm->stack.stack[dvm->stack.stack_pointer]
+                = dvm->stack.stack[dvm->stack.stack_pointer-1];
             dvm->stack.stack_pointer++;
             pc++;
             break;
@@ -828,17 +1054,74 @@ execute(DVM_VirtualMachine *dvm, Function *func,
             } else {
                 invoke_diksam_function(dvm, &func, &dvm->function[func_idx],
                                        &code, &code_size, &pc,
-                                       &dvm->stack.stack_pointer, &base, &exe);
+                                       &dvm->stack.stack_pointer, &base,
+                                       &exe);
             }
             break;
         }
         case DVM_RETURN:
             return_function(dvm, &func, &code, &code_size, &pc,
-                            &dvm->stack.stack_pointer, &base, &exe);
+                            &dvm->stack.stack_pointer, &base,
+                            &exe);
             break;
+        case DVM_NEW_ARRAY:
+        {
+            int dim = code[pc+1];
+            DVM_TypeSpecifier *type
+                = &exe->type_specifier[GET_2BYTE_INT(&code[pc+2])];
+            DVM_Object *array;
+
+            restore_pc(dvm, exe, func, pc);
+            array = create_array(dvm, dim, type);
+            dvm->stack.stack_pointer -= dim;
+            STO_WRITE(dvm, 0, array);
+            dvm->stack.stack_pointer++;
+            pc += 4;
+            break;
+        }
+        case DVM_NEW_ARRAY_LITERAL_INT: /* FALLTHRU */
+        {
+            int size = GET_2BYTE_INT(&code[pc+1]);
+            DVM_Object *array;
+
+            restore_pc(dvm, exe, func, pc);
+            array = create_array_literal_int(dvm, size);
+            dvm->stack.stack_pointer -= size;
+            STO_WRITE(dvm, 0, array);
+            dvm->stack.stack_pointer++;
+            pc += 3;
+            break;
+        }
+        case DVM_NEW_ARRAY_LITERAL_DOUBLE: /* FALLTHRU */
+        {
+            int size = GET_2BYTE_INT(&code[pc+1]);
+            DVM_Object *array;
+
+            restore_pc(dvm, exe, func, pc);
+            array = create_array_literal_double(dvm, size);
+            dvm->stack.stack_pointer -= size;
+            STO_WRITE(dvm, 0, array);
+            dvm->stack.stack_pointer++;
+            pc += 3;
+            break;
+        }
+        case DVM_NEW_ARRAY_LITERAL_OBJECT: /* FALLTHRU */
+        {
+            int size = GET_2BYTE_INT(&code[pc+1]);
+            DVM_Object *array;
+
+            restore_pc(dvm, exe, func, pc);
+            array = create_array_literal_object(dvm, size);
+            dvm->stack.stack_pointer -= size;
+            STO_WRITE(dvm, 0, array);
+            dvm->stack.stack_pointer++;
+            pc += 3;
+            break;
+        }
         default:
             DBG_assert(0, ("code[pc]..%d\n", code[pc]));
         }
+        /* MEM_check_all_blocks(); */
     }
 
     return ret;
@@ -849,6 +1132,8 @@ DVM_execute(DVM_VirtualMachine *dvm)
 {
     DVM_Value ret;
 
+    dvm->current_executable = dvm->executable;
+    dvm->current_function = NULL;
     dvm->pc = 0;
     expand_stack(dvm, dvm->executable->need_stack_size);
     execute(dvm, NULL, dvm->executable->code, dvm->executable->code_size);

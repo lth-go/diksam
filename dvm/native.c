@@ -7,11 +7,18 @@ nv_print_proc(DVM_VirtualMachine *dvm,
               int arg_count, DVM_Value *args)
 {
     DVM_Value ret;
+    DVM_Char *str;
 
     ret.int_value = 0;
 
     DBG_assert(arg_count == 1, ("arg_count..%d", arg_count));
-    dvm_print_wcs(stdout, args[0].object->u.string.string);
+
+    if (args[0].object == NULL) {
+        str = NULL_STRING;
+    } else {
+        str = args[0].object->u.string.string;
+    }
+    dvm_print_wcs(stdout, str);
     fflush(stdout);
 
     return ret;
