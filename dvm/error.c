@@ -6,10 +6,8 @@
 #include "DBG.h"
 #include "dvm_pri.h"
 
-extern ErrorDefinition dvm_error_message_format[];
-
 typedef struct {
-    MessageArgumentType type;
+    DVM_MessageArgumentType type;
     char        *name;
     union {
         int     int_val;
@@ -24,29 +22,29 @@ static void
 create_message_argument(MessageArgument *arg, va_list ap)
 {
     int index = 0;
-    MessageArgumentType type;
+    DVM_MessageArgumentType type;
     
-    while ((type = va_arg(ap, MessageArgumentType))
-           != MESSAGE_ARGUMENT_END) {
+    while ((type = va_arg(ap, DVM_MessageArgumentType))
+           != DVM_MESSAGE_ARGUMENT_END) {
         arg[index].type = type;
         arg[index].name = va_arg(ap, char*);
         switch (type) {
-        case INT_MESSAGE_ARGUMENT:
+        case DVM_INT_MESSAGE_ARGUMENT:
             arg[index].u.int_val = va_arg(ap, int);
             break;
-        case DOUBLE_MESSAGE_ARGUMENT:
+        case DVM_DOUBLE_MESSAGE_ARGUMENT:
             arg[index].u.double_val = va_arg(ap, double);
             break;
-        case STRING_MESSAGE_ARGUMENT:
+        case DVM_STRING_MESSAGE_ARGUMENT:
             arg[index].u.string_val = va_arg(ap, char*);
             break;
-        case POINTER_MESSAGE_ARGUMENT:
+        case DVM_POINTER_MESSAGE_ARGUMENT:
             arg[index].u.pointer_val = va_arg(ap, void*);
             break;
-        case CHARACTER_MESSAGE_ARGUMENT:
+        case DVM_CHARACTER_MESSAGE_ARGUMENT:
             arg[index].u.character_val = va_arg(ap, int);
             break;
-        case MESSAGE_ARGUMENT_END:
+        case DVM_MESSAGE_ARGUMENT_END:
             assert(0);
             break;
         default:
@@ -63,7 +61,7 @@ search_argument(MessageArgument *arg_list,
 {
     int i;
 
-    for (i = 0; arg_list[i].type != MESSAGE_ARGUMENT_END; i++) {
+    for (i = 0; arg_list[i].type != DVM_MESSAGE_ARGUMENT_END; i++) {
         if (!strcmp(arg_list[i].name, arg_name)) {
             *arg = arg_list[i];
             return;
@@ -73,7 +71,7 @@ search_argument(MessageArgument *arg_list,
 }
 
 static void
-format_message(ErrorDefinition *format, VString *v,
+format_message(DVM_ErrorDefinition *format, VString *v,
                va_list ap)
 {
     int         i;
@@ -106,31 +104,31 @@ format_message(ErrorDefinition *format, VString *v,
 
         search_argument(arg, arg_name, &cur_arg);
         switch (cur_arg.type) {
-        case INT_MESSAGE_ARGUMENT:
+        case DVM_INT_MESSAGE_ARGUMENT:
             sprintf(buf, "%d", cur_arg.u.int_val);
             dvm_mbstowcs(buf, wc_buf);
             dvm_vstr_append_string(v, wc_buf);
             break;
-        case DOUBLE_MESSAGE_ARGUMENT:
+        case DVM_DOUBLE_MESSAGE_ARGUMENT:
             sprintf(buf, "%f", cur_arg.u.double_val);
             dvm_mbstowcs(buf, wc_buf);
             dvm_vstr_append_string(v, wc_buf);
             break;
-        case STRING_MESSAGE_ARGUMENT:
+        case DVM_STRING_MESSAGE_ARGUMENT:
             dvm_mbstowcs(cur_arg.u.string_val, wc_buf);
             dvm_vstr_append_string(v, wc_buf);
             break;
-        case POINTER_MESSAGE_ARGUMENT:
+        case DVM_POINTER_MESSAGE_ARGUMENT:
             sprintf(buf, "%p", cur_arg.u.pointer_val);
             dvm_mbstowcs(buf, wc_buf);
             dvm_vstr_append_string(v, wc_buf);
             break;
-        case CHARACTER_MESSAGE_ARGUMENT:
+        case DVM_CHARACTER_MESSAGE_ARGUMENT:
             sprintf(buf, "%c", cur_arg.u.character_val);
             dvm_mbstowcs(buf, wc_buf);
             dvm_vstr_append_string(v, wc_buf);
             break;
-        case MESSAGE_ARGUMENT_END:
+        case DVM_MESSAGE_ARGUMENT_END:
             assert(0);
             break;
         default:
@@ -155,8 +153,8 @@ self_check()
     }
 }
 
-static int
-conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
+int
+dvm_conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
 {
     DVM_LineNumber *line_number;
     int line_number_size;
@@ -164,7 +162,8 @@ conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
     int ret;
 
     if (func) {
-        line_number = exe->function[func->u.diksam_f.index].line_number;
+        line_number
+            = exe->function[func->u.diksam_f.index].line_number;
         line_number_size
             = exe->function[func->u.diksam_f.index].line_number_size;
     } else {
@@ -172,7 +171,7 @@ conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
         line_number_size = exe->line_number_size;
     }
 
-    for (i = 0; i < exe->line_number_size; i++) {
+    for (i = 0; i < line_number_size; i++) {
         if (pc >= line_number[i].start_pc
             && pc < line_number[i].start_pc + line_number[i].pc_count) {
             ret = line_number[i].line_number;
@@ -182,26 +181,57 @@ conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
     return ret;
 }
 
-void
-dvm_error(DVM_Executable *exe, Function *func, int pc, RuntimeError id, ...)
+static void
+error_v(DVM_Executable *exe, Function *func, int pc,
+        DVM_ErrorDefinition *error_def, RuntimeError id, va_list ap)
 {
-    va_list     ap;
     VString     message;
     int         line_number;
 
-    self_check();
-    va_start(ap, id);
-
     dvm_vstr_clear(&message);
-    format_message(&dvm_error_message_format[id],
-                   &message, ap);
+    format_message(&error_def[id], &message, ap);
 
     if (pc != NO_LINE_NUMBER_PC) {
-        line_number = conv_pc_to_line_number(exe, func, pc);
-        fprintf(stderr, "%3d:", line_number);
+        line_number = dvm_conv_pc_to_line_number(exe, func, pc);
+        fprintf(stderr, "%s:%d:", exe->path, line_number);
     }
     dvm_print_wcs_ln(stderr, message.string);
+}
+
+void
+dvm_error_i(DVM_Executable *exe, Function *func, int pc,
+            RuntimeError id, ...)
+{
+    va_list     ap;
+
+    self_check();
+    va_start(ap, id);
+    error_v(exe, func, pc, dvm_error_message_format, id, ap);
     va_end(ap);
 
     exit(1);
+}
+
+void
+dvm_error_n(DVM_VirtualMachine *dvm, DVM_ErrorDefinition *error_def,
+            RuntimeError id, ...)
+{
+    va_list     ap;
+
+    self_check();
+    va_start(ap, id);
+    error_v(dvm->current_executable->executable,
+            dvm->current_function, dvm->pc, error_def, id, ap);
+    va_end(ap);
+
+    exit(1);
+}
+
+void
+dvm_format_message(DVM_ErrorDefinition *error_definition,
+                   int id, VString *message, va_list ap)
+{
+    dvm_vstr_clear(message);
+    format_message(&error_definition[id],
+                   message, ap);
 }

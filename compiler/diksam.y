@@ -5,6 +5,9 @@
 %}
 %union {
     char                *identifier;
+    PackageName         *package_name;
+    RequireList         *require_list;
+    RenameList          *rename_list;
     ParameterList       *parameter_list;
     ArgumentList        *argument_list;
     Expression          *expression;
@@ -17,47 +20,126 @@
     TypeSpecifier       *type_specifier;
     DVM_BasicType       basic_type_specifier;
     ArrayDimension      *array_dimension;
+    ClassOrMemberModifierList class_or_member_modifier;
+    DVM_ClassOrInterface class_or_interface;
+    ExtendsList         *extends_list;
+    MemberDeclaration   *member_declaration;
+    FunctionDefinition  *function_definition;
 }
 %token <expression>     INT_LITERAL
 %token <expression>     DOUBLE_LITERAL
 %token <expression>     STRING_LITERAL
 %token <expression>     REGEXP_LITERAL
 %token <identifier>     IDENTIFIER
-%token IF ELSE ELSIF WHILE FOR FOREACH RETURN_T BREAK CONTINUE NULL_T
+%token IF ELSE ELSIF WHILE DO_T FOR FOREACH
+        RETURN_T BREAK CONTINUE NULL_T
         LP RP LC RC LB RB SEMICOLON COLON COMMA ASSIGN_T LOGICAL_AND LOGICAL_OR
-        EQ NE GT GE LT LE ADD SUB MUL DIV MOD TRUE_T FALSE_T EXCLAMATION DOT
+        EQ NE GT GE LT LE ADD SUB MUL DIV MOD
+        TRUE_T FALSE_T EXCLAMATION DOT
         ADD_ASSIGN_T SUB_ASSIGN_T MUL_ASSIGN_T DIV_ASSIGN_T MOD_ASSIGN_T
-        INCREMENT DECREMENT TRY CATCH FINALLY THROW
-        BOOLEAN_T INT_T DOUBLE_T STRING_T NEW
+        INCREMENT DECREMENT
+        VOID_T BOOLEAN_T INT_T DOUBLE_T STRING_T
+        NEW REQUIRE RENAME
+        CLASS_T INTERFACE_T PUBLIC_T PRIVATE_T VIRTUAL_T OVERRIDE_T
+        ABSTRACT_T THIS_T SUPER_T CONSTRUCTOR INSTANCEOF
+        DOWN_CAST_BEGIN DOWN_CAST_END
+%type   <package_name> package_name
+%type   <require_list> require_list require_declaration
+%type   <rename_list> rename_list rename_declaration
 %type   <parameter_list> parameter_list
 %type   <argument_list> argument_list
 %type   <expression> expression expression_opt
         assignment_expression logical_and_expression logical_or_expression
         equality_expression relational_expression
         additive_expression multiplicative_expression
-        unary_expression primary_expression primary_no_new_array
-        array_literal array_creation
+        unary_expression postfix_expression primary_expression
+        primary_no_new_array array_literal array_creation
 %type   <expression_list> expression_list
 %type   <statement> statement
-        if_statement while_statement for_statement foreach_statement
-        return_statement break_statement continue_statement try_statement
-        throw_statement declaration_statement
+        if_statement while_statement for_statement do_while_statement
+        foreach_statement
+        return_statement break_statement continue_statement
+        declaration_statement
 %type   <statement_list> statement_list
 %type   <block> block
 %type   <elsif> elsif elsif_list
 %type   <assignment_operator> assignment_operator
 %type   <identifier> identifier_opt label_opt
-%type   <type_specifier> type_specifier
+%type   <type_specifier> type_specifier class_type_specifier
+        array_type_specifier
 %type   <basic_type_specifier> basic_type_specifier
 %type   <array_dimension> dimension_expression dimension_expression_list
         dimension_list
+%type   <class_or_member_modifier> class_or_member_modifier
+        class_or_member_modifier_list access_modifier
+%type   <class_or_interface> class_or_interface
+%type   <extends_list> extends_list extends
+%type   <member_declaration> member_declaration member_declaration_list
+        method_member field_member
+%type   <function_definition> method_function_definition
+        constructor_definition
 %%
 translation_unit
-        : definition_or_statement
+        : initial_declaration definition_or_statement
         | translation_unit definition_or_statement
+        ;
+initial_declaration
+        : /* empty */
+        {
+            dkc_set_require_and_rename_list(NULL, NULL);
+        }
+        | require_list rename_list
+        {
+            dkc_set_require_and_rename_list($1, $2);
+        }
+        | require_list
+        {
+            dkc_set_require_and_rename_list($1, NULL);
+        }
+        | rename_list
+        {
+            dkc_set_require_and_rename_list(NULL, $1);
+        }
+        ;
+require_list
+        : require_declaration
+        | require_list require_declaration
+        {
+            $$ = dkc_chain_require_list($1, $2);
+        }
+        ;
+require_declaration
+        : REQUIRE package_name SEMICOLON
+        {
+            $$ = dkc_create_require_list($2);
+        }
+        ;
+package_name
+        : IDENTIFIER
+        {
+            $$ = dkc_create_package_name($1);
+        }
+        | package_name DOT IDENTIFIER
+        {
+            $$ = dkc_chain_package_name($1, $3);
+        }
+        ;
+rename_list
+        : rename_declaration
+        | rename_list rename_declaration
+        {
+            $$ = dkc_chain_rename_list($1, $2);
+        }
+        ;
+rename_declaration
+        : RENAME package_name IDENTIFIER SEMICOLON
+        {
+            $$ = dkc_create_rename_list($2, $3);
+        }
         ;
 definition_or_statement
         : function_definition
+        | class_definition
         | statement
         {
             DKC_Compiler *compiler = dkc_get_current_compiler();
@@ -67,7 +149,11 @@ definition_or_statement
         }
         ;
 basic_type_specifier
-        : BOOLEAN_T
+        : VOID_T
+        {
+            $$ = DVM_VOID_TYPE;
+        }
+        | BOOLEAN_T
         {
             $$ = DVM_BOOLEAN_TYPE;
         }
@@ -84,15 +170,37 @@ basic_type_specifier
             $$ = DVM_STRING_TYPE;
         }
         ;
-type_specifier
-        : basic_type_specifier
+class_type_specifier
+        : IDENTIFIER
         {
-            $$ = dkc_create_type_specifier($1);
+            $$ = dkc_create_class_type_specifier($1);
         }
-        | type_specifier LB RB
+        ;
+array_type_specifier
+        : basic_type_specifier LB RB
+        {
+            TypeSpecifier *basic_type
+                = dkc_create_type_specifier($1);
+            $$ = dkc_create_array_type_specifier(basic_type);
+        }
+        | IDENTIFIER LB RB
+        {
+            TypeSpecifier *class_type
+                = dkc_create_class_type_specifier($1);
+            $$ = dkc_create_array_type_specifier(class_type);
+        }
+        | array_type_specifier LB RB
         {
             $$ = dkc_create_array_type_specifier($1);
         }
+        ;
+type_specifier
+        : basic_type_specifier
+        {
+                    $$ = dkc_create_type_specifier($1);
+        }
+        | array_type_specifier
+        | class_type_specifier
         ;
 function_definition
         : type_specifier IDENTIFIER LP parameter_list RP block
@@ -103,7 +211,8 @@ function_definition
         {
             dkc_function_define($1, $2, NULL, $5);
         }
-        | type_specifier IDENTIFIER LP parameter_list RP SEMICOLON
+        | type_specifier IDENTIFIER LP parameter_list RP
+          SEMICOLON
         {
             dkc_function_define($1, $2, $4, NULL);
         }
@@ -253,7 +362,7 @@ multiplicative_expression
         }
         ;
 unary_expression
-        : primary_expression
+        : postfix_expression
         | SUB unary_expression
         {
             $$ = dkc_create_minus_expression($2);
@@ -263,14 +372,38 @@ unary_expression
             $$ = dkc_create_logical_not_expression($2);
         }
         ;
+postfix_expression
+        : primary_expression
+        | primary_expression INCREMENT
+        {
+            $$ = dkc_create_incdec_expression($1, INCREMENT_EXPRESSION);
+        }
+        | primary_expression DECREMENT
+        {
+            $$ = dkc_create_incdec_expression($1, DECREMENT_EXPRESSION);
+        }
+        | primary_expression INSTANCEOF type_specifier
+        {
+            $$ = dkc_create_instanceof_expression($1, $3);
+        }
+        ;
 primary_expression
         : primary_no_new_array
         | array_creation
+        | IDENTIFIER
+        {
+            $$ = dkc_create_identifier_expression($1);
+        }
         ;
 primary_no_new_array
         : primary_no_new_array LB expression RB
         {
             $$ = dkc_create_index_expression($1, $3);
+        }
+        | IDENTIFIER LB expression RB
+        {
+            Expression *identifier = dkc_create_identifier_expression($1);
+            $$ = dkc_create_index_expression(identifier, $3);
         }
         | primary_expression DOT IDENTIFIER
         {
@@ -284,21 +417,13 @@ primary_no_new_array
         {
             $$ = dkc_create_function_call_expression($1, NULL);
         }
-        | primary_expression INCREMENT
-        {
-            $$ = dkc_create_incdec_expression($1, INCREMENT_EXPRESSION);
-        }
-        | primary_expression DECREMENT
-        {
-            $$ = dkc_create_incdec_expression($1, DECREMENT_EXPRESSION);
-        }
         | LP expression RP
         {
             $$ = $2;
         }
-        | IDENTIFIER
+        | primary_expression DOWN_CAST_BEGIN type_specifier DOWN_CAST_END
         {
-            $$ = dkc_create_identifier_expression($1);
+            $$ = dkc_create_down_cast_expression($1, $3);
         }
         | INT_LITERAL
         | DOUBLE_LITERAL
@@ -317,6 +442,30 @@ primary_no_new_array
             $$ = dkc_create_null_expression();
         }
         | array_literal
+        | THIS_T
+        {
+            $$ = dkc_create_this_expression();
+        }
+        | SUPER_T
+        {
+            $$ = dkc_create_super_expression();
+        }
+        | NEW IDENTIFIER LP RP
+        {
+            $$ = dkc_create_new_expression($2, NULL, NULL);
+        }
+        | NEW IDENTIFIER LP argument_list RP
+        {
+            $$ = dkc_create_new_expression($2, NULL, $4);
+        }
+        | NEW IDENTIFIER DOT IDENTIFIER LP RP
+        {
+            $$ = dkc_create_new_expression($2, $4, NULL);
+        }
+        | NEW IDENTIFIER DOT IDENTIFIER LP argument_list RP
+        {
+            $$ = dkc_create_new_expression($2, $4, $6);
+        }
         ;
 array_literal
         : LC expression_list RC
@@ -331,11 +480,20 @@ array_literal
 array_creation
         : NEW basic_type_specifier dimension_expression_list
         {
-            $$ = dkc_create_array_creation($2, $3, NULL);
+            $$ = dkc_create_basic_array_creation($2, $3, NULL);
         }
         | NEW basic_type_specifier dimension_expression_list dimension_list
         {
-            $$ = dkc_create_array_creation($2, $3, $4);
+            $$ = dkc_create_basic_array_creation($2, $3, $4);
+        }
+        | NEW class_type_specifier dimension_expression_list
+        {
+            $$ = dkc_create_class_array_creation($2, $3, NULL);
+        }
+        | NEW class_type_specifier dimension_expression_list
+            dimension_list
+        {
+            $$ = dkc_create_class_array_creation($2, $3, $4);
         }
         ;
 dimension_expression_list
@@ -384,12 +542,11 @@ statement
         | if_statement
         | while_statement
         | for_statement
+        | do_while_statement
         | foreach_statement
         | return_statement
         | break_statement
         | continue_statement
-        | try_statement
-        | throw_statement
         | declaration_statement
         ;
 if_statement
@@ -446,6 +603,12 @@ for_statement
             $$ = dkc_create_for_statement($1, $4, $6, $8, $10);
         }
         ;
+do_while_statement
+        : label_opt DO_T block WHILE LP expression RP SEMICOLON
+        {
+            $$ = dkc_create_do_while_statement($1, $3, $6);
+        }
+        ;
 foreach_statement
         : label_opt FOREACH LP IDENTIFIER COLON expression RP block
         {
@@ -484,24 +647,6 @@ continue_statement
             $$ = dkc_create_continue_statement($2);
         }
         ;
-try_statement
-        : TRY block CATCH LP IDENTIFIER RP block FINALLY block
-        {
-            $$ = dkc_create_try_statement($2, $5, $7, $9);
-        }
-        | TRY block FINALLY block
-        {
-            $$ = dkc_create_try_statement($2, NULL, NULL, $4);
-        }
-        | TRY block CATCH LP IDENTIFIER RP block
-        {
-            $$ = dkc_create_try_statement($2, $5, $7, NULL);
-        }
-throw_statement
-        : THROW expression SEMICOLON
-        {
-            $$ = dkc_create_throw_statement($2);
-        }
 declaration_statement
         : type_specifier IDENTIFIER SEMICOLON
         {
@@ -525,6 +670,181 @@ block
         {
             Block *empty_block = dkc_open_block();
             $<block>$ = dkc_close_block(empty_block, NULL);
+        }
+        ;
+class_definition
+        : class_or_interface IDENTIFIER
+          extends LC
+        {
+            dkc_start_class_definition(NULL, $1, $2, $3);
+        }
+          member_declaration_list RC
+        {
+            dkc_class_define($6);
+        }
+        | class_or_member_modifier_list class_or_interface IDENTIFIER
+          extends LC
+        {
+            dkc_start_class_definition(&$1, $2, $3, $4);
+        } member_declaration_list RC
+        {
+            dkc_class_define($7);
+        }
+        | class_or_interface IDENTIFIER extends LC
+        {
+            dkc_start_class_definition(NULL, $1, $2, $3);
+        }
+          RC
+        {
+            dkc_class_define(NULL);
+        }
+        | class_or_member_modifier_list class_or_interface IDENTIFIER
+          extends LC
+        {
+            dkc_start_class_definition(&$1, $2, $3, $4);
+        }
+          RC
+        {
+            dkc_class_define(NULL);
+        }
+        ;
+class_or_member_modifier_list
+        : class_or_member_modifier
+        | class_or_member_modifier_list class_or_member_modifier
+        {
+            $$ = dkc_chain_class_or_member_modifier($1, $2);
+        }
+        ;
+class_or_member_modifier
+        : access_modifier
+        | VIRTUAL_T
+        {
+            $$ = dkc_create_class_or_member_modifier(VIRTUAL_MODIFIER);
+        }
+        | OVERRIDE_T
+        {
+            $$ = dkc_create_class_or_member_modifier(OVERRIDE_MODIFIER);
+        }
+        | ABSTRACT_T
+        {
+            $$ = dkc_create_class_or_member_modifier(ABSTRACT_MODIFIER);
+        }
+        ;
+class_or_interface
+        : CLASS_T
+        {
+            $$ = DVM_CLASS_DEFINITION;
+        }
+        | INTERFACE_T
+        {
+            $$ = DVM_INTERFACE_DEFINITION;
+        }
+        ;
+extends
+        : /* empty */
+        {
+            $$ = NULL;
+        }
+        | COLON extends_list
+        {
+            $$ = $2;
+        }
+        ;
+extends_list
+        : IDENTIFIER
+        {
+            $$ = dkc_create_extends_list($1);
+        }
+        | extends_list COMMA IDENTIFIER
+        {
+            $$ = dkc_chain_extends_list($1, $3);
+        }
+        ;
+member_declaration_list
+        : member_declaration
+        | member_declaration_list member_declaration
+        {
+            $$ = dkc_chain_member_declaration($1, $2);
+        }
+        ;
+member_declaration
+        : method_member
+        | field_member
+        ;
+method_member
+        : method_function_definition
+        {
+            $$ = dkc_create_method_member(NULL, $1, DVM_FALSE);
+        }
+        | class_or_member_modifier_list method_function_definition
+        {
+            $$ = dkc_create_method_member(&$1, $2, DVM_FALSE);
+        }
+        | constructor_definition
+        {
+            $$ = dkc_create_method_member(NULL, $1, DVM_TRUE);
+        }
+        | class_or_member_modifier_list constructor_definition
+        {
+            $$ = dkc_create_method_member(&$1, $2, DVM_TRUE);
+        }
+        ;
+method_function_definition
+        : type_specifier IDENTIFIER LP parameter_list RP block
+        {
+            $$ = dkc_method_function_define($1, $2, $4, $6);
+        }
+        | type_specifier IDENTIFIER LP RP block
+        {
+            $$ = dkc_method_function_define($1, $2, NULL, $5);
+        }
+        | type_specifier IDENTIFIER LP parameter_list RP
+          SEMICOLON
+        {
+            $$ = dkc_method_function_define($1, $2, $4, NULL);
+        }
+        | type_specifier IDENTIFIER LP RP SEMICOLON
+        {
+            $$ = dkc_method_function_define($1, $2, NULL, NULL);
+        }
+        ;
+constructor_definition
+        : CONSTRUCTOR IDENTIFIER LP parameter_list RP block
+        {
+            $$ = dkc_constructor_function_define($2, $4, $6);
+        }
+        | CONSTRUCTOR IDENTIFIER LP RP block
+        {
+            $$ = dkc_constructor_function_define($2, NULL, $5);
+        }
+        | CONSTRUCTOR IDENTIFIER LP parameter_list RP SEMICOLON
+        {
+            $$ = dkc_constructor_function_define($2, $4, NULL);
+        }
+        | CONSTRUCTOR IDENTIFIER LP RP SEMICOLON
+        {
+            $$ = dkc_constructor_function_define($2, NULL, NULL);
+        }
+        ;
+access_modifier
+        : PUBLIC_T
+        {
+            $$ = dkc_create_class_or_member_modifier(PUBLIC_MODIFIER);
+        }
+        | PRIVATE_T
+        {
+            $$ = dkc_create_class_or_member_modifier(PRIVATE_MODIFIER);
+        }
+        ;
+field_member
+        : type_specifier IDENTIFIER SEMICOLON
+        {
+            $$ = dkc_create_field_member(NULL, $1, $2);
+        }
+        | class_or_member_modifier_list type_specifier
+          IDENTIFIER SEMICOLON
+        {
+            $$ = dkc_create_field_member(&$1, $2, $3);
         }
         ;
 %%

@@ -1,7 +1,4 @@
-int print(string str);
-int println(string str) {
-    print(str + "\n");
-}
+require diksam.lang;
 
 ////////////////////////////////////////////////////////////
 // Check lexical analyzer
@@ -261,6 +258,7 @@ print("double_val.." + double_val + "\n");
 
 str_val = "str";
 str_val += "hoge";
+str_val += 3;
 print("str_val.." + str_val + "\n");
 
 ////////////////////////////////////////////////////////////

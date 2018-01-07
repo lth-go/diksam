@@ -49,7 +49,12 @@ dkc_alloc_type_specifier(DVM_BasicType type)
     TypeSpecifier *ts = dkc_malloc(sizeof(TypeSpecifier));
 
     ts->basic_type = type;
+    ts->line_number = 0;
     ts->derive = NULL;
+    if (type == DVM_CLASS_TYPE) {
+        ts->class_ref.identifier = NULL;
+        ts->class_ref.class_definition = NULL;
+    }
 
     return ts;
 }
@@ -62,6 +67,16 @@ dkc_alloc_type_derive(DeriveTag derive_tag)
     td->next = NULL;
 
     return td;
+}
+
+TypeSpecifier *
+dkc_alloc_type_specifier2(TypeSpecifier *src)
+{
+    TypeSpecifier *ts = dkc_malloc(sizeof(TypeSpecifier));
+
+    *ts = *src;
+
+    return ts;
 }
 
 DVM_Boolean
@@ -96,6 +111,14 @@ dkc_compare_type(TypeSpecifier *type1, TypeSpecifier *type2)
         return DVM_FALSE;
     }
 
+    /* BUGBUG? */
+    if (type1->basic_type == DVM_CLASS_TYPE) {
+        if (type1->class_ref.class_definition
+            != type2->class_ref.class_definition) {
+            return DVM_FALSE;
+        }
+    }
+
     for (d1 = type1->derive, d2 = type2->derive;
          d1 && d2; d1 = d1->next, d2 = d2->next) {
         if (d1->tag != d2->tag) {
@@ -115,19 +138,88 @@ dkc_compare_type(TypeSpecifier *type1, TypeSpecifier *type2)
     return DVM_TRUE;
 }
 
+DVM_Boolean
+dkc_compare_package_name(PackageName *p1, PackageName *p2)
+{
+    PackageName *pos1;
+    PackageName *pos2;
+
+    for (pos1 = p1, pos2 = p2; pos1 && pos2;
+         pos1 = pos1->next, pos2 = pos2->next) {
+        if (strcmp(pos1->name, pos2->name) != 0) {
+            return DVM_FALSE;
+        }
+    }
+    if (pos1 || pos2) {
+        return DVM_FALSE;
+    }
+
+    return DVM_TRUE;
+}
+
+static FunctionDefinition *
+search_renamed_function(DKC_Compiler *compiler, RenameList *rename)
+{
+    FunctionDefinition *func_pos;
+    CompilerList *comp_pos;
+
+    for (comp_pos = compiler->required_list; comp_pos;
+         comp_pos = comp_pos->next) {
+        if (!dkc_compare_package_name(rename->package_name,
+                                      comp_pos->compiler->package_name)) {
+            continue;
+        }
+        for (func_pos = comp_pos->compiler->function_list; func_pos;
+             func_pos = func_pos->next) {
+            if (!strcmp(func_pos->name, rename->original_name)
+                && func_pos->class_definition == NULL) {
+                return func_pos;
+            }
+        }
+    }
+    return NULL;
+}
+
 FunctionDefinition *
 dkc_search_function(char *name)
 {
     DKC_Compiler *compiler;
-    FunctionDefinition *pos;
+    RenameList *ren_pos;
+    CompilerList *comp_pos;
+    FunctionDefinition *func_pos;
 
     compiler = dkc_get_current_compiler();
 
-    for (pos = compiler->function_list; pos; pos = pos->next) {
-        if (!strcmp(pos->name, name))
-            break;
+    for (func_pos = compiler->function_list; func_pos;
+         func_pos = func_pos->next) {
+        if (!strcmp(func_pos->name, name)
+            && func_pos->class_definition == NULL) {
+            return func_pos;
+        }
     }
-    return pos;
+
+    for (ren_pos = compiler->rename_list; ren_pos; ren_pos = ren_pos->next) {
+        if (!strcmp(ren_pos->renamed_name, name)) {
+            FunctionDefinition * fd
+                = search_renamed_function(compiler, ren_pos);
+            if (fd) {
+                return fd;
+            }
+        }
+    }
+
+    for (comp_pos = compiler->required_list; comp_pos;
+         comp_pos = comp_pos->next) {
+        for (func_pos = comp_pos->compiler->function_list; func_pos;
+             func_pos = func_pos->next) {
+            if (!strcmp(func_pos->name, name)
+                && func_pos->class_definition == NULL) {
+                return func_pos;
+            }
+        }
+    }
+
+    return NULL;
 }
 
 Declaration *
@@ -150,6 +242,109 @@ dkc_search_declaration(char *identifier, Block *block)
     for (d_pos = compiler->declaration_list; d_pos; d_pos = d_pos->next) {
         if (!strcmp(identifier, d_pos->declaration->name)) {
             return d_pos->declaration;
+        }
+    }
+
+    return NULL;
+}
+
+static ClassDefinition *
+search_renamed_class(DKC_Compiler *compiler, RenameList *rename)
+{
+    ClassDefinition *class_pos;
+    CompilerList *comp_pos;
+
+    for (comp_pos = compiler->required_list; comp_pos;
+         comp_pos = comp_pos->next) {
+        if (!dkc_compare_package_name(rename->package_name,
+                                      comp_pos->compiler->package_name)) {
+            continue;
+        }
+        for (class_pos = comp_pos->compiler->class_definition_list; class_pos;
+             class_pos = class_pos->next) {
+            if (!strcmp(class_pos->name, rename->original_name)) {
+                return class_pos;
+            }
+        }
+    }
+    return NULL;
+}
+
+ClassDefinition *
+dkc_search_class(char *identifier)
+{
+    DKC_Compiler *compiler;
+    RenameList *ren_pos;
+    CompilerList *comp_pos;
+    ClassDefinition *class_def;
+
+    compiler = dkc_get_current_compiler();
+    for (class_def = compiler->class_definition_list;
+         class_def; class_def = class_def->next) {
+        if (!strcmp(class_def->name, identifier)) {
+            return class_def;
+        }
+    }
+
+    for (ren_pos = compiler->rename_list; ren_pos; ren_pos = ren_pos->next) {
+        if (!strcmp(ren_pos->renamed_name, identifier)) {
+            class_def = search_renamed_class(compiler, ren_pos);
+            if (class_def) {
+                return class_def;
+            }
+        }
+    }
+
+    for (comp_pos = compiler->required_list; comp_pos;
+         comp_pos = comp_pos->next) {
+        for (class_def = comp_pos->compiler->class_definition_list;
+             class_def; class_def = class_def->next) {
+            if (!strcmp(class_def->name, identifier)) {
+                return class_def;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+MemberDeclaration *
+dkc_search_member(ClassDefinition *class_def,
+                  char *member_name)
+{
+    MemberDeclaration *member;
+    ExtendsList *extends_p;
+    
+    for (member = class_def->member; member;
+         member = member->next) {
+        if (member->kind == METHOD_MEMBER) {
+            if (!strcmp(member->u.method.function_definition->name,
+                        member_name)) {
+                break;
+            }
+        } else {
+            DBG_assert(member->kind == FIELD_MEMBER,
+                       ("member..%d", member->kind));
+            if (!strcmp(member->u.field.name, member_name)) {
+                break;
+            }
+        }
+    }
+    if (member) {
+        return member;
+    }
+    if (class_def->super_class) {
+        member = dkc_search_member(class_def->super_class, member_name);
+    }
+    if (member) {
+        return member;
+    }
+    for (extends_p = class_def->interface_list;
+         extends_p;
+         extends_p = extends_p->next) {
+        member = dkc_search_member(extends_p->class_definition, member_name);
+        if (member) {
+            return member;
         }
     }
 
@@ -236,6 +431,9 @@ char *
 dkc_get_basic_type_name(DVM_BasicType type)
 {
     switch (type) {
+    case DVM_VOID_TYPE:
+        return "void";
+        break;
     case DVM_BOOLEAN_TYPE:
         return "boolean";
         break;
@@ -248,13 +446,36 @@ dkc_get_basic_type_name(DVM_BasicType type)
     case DVM_STRING_TYPE:
         return "string";
         break;
+    case DVM_CLASS_TYPE:
+        return "class";
+        break;
     case DVM_NULL_TYPE:
         return "null";
         break;
+    case DVM_BASE_TYPE: /* FALLTHRU */
     default:
         DBG_assert(0, ("bad case. type..%d\n", type));
     }
     return NULL;
+}
+
+static void
+function_type_to_string(VString *vstr, TypeDerive *derive)
+{
+    ParameterList *param_pos;
+
+    dkc_vstr_append_string(vstr, "(");
+    for (param_pos = derive->u.function_d.parameter_list; param_pos;
+         param_pos = param_pos->next) {
+        char *type_name = dkc_get_type_name(param_pos->type);
+        dkc_vstr_append_string(vstr, type_name);
+        dkc_vstr_append_string(vstr, " ");
+        dkc_vstr_append_string(vstr, param_pos->name);
+        if (param_pos->next) {
+            dkc_vstr_append_string(vstr, ", ");
+        }
+    }
+    dkc_vstr_append_string(vstr, ")");
 }
 
 char *
@@ -264,13 +485,19 @@ dkc_get_type_name(TypeSpecifier *type)
     TypeDerive  *derive_pos;
 
     dkc_vstr_clear(&vstr);
-    dkc_vstr_append_string(&vstr, dkc_get_basic_type_name(type->basic_type));
+
+    if (type->basic_type == DVM_CLASS_TYPE) {
+        dkc_vstr_append_string(&vstr, type->class_ref.identifier);
+    } else {
+        dkc_vstr_append_string(&vstr,
+                               dkc_get_basic_type_name(type->basic_type));
+    }
 
     for (derive_pos = type->derive; derive_pos;
          derive_pos = derive_pos->next) {
         switch (derive_pos->tag) {
         case FUNCTION_DERIVE:
-            DBG_assert(0, ("derive_tag..%d\n", derive_pos->tag));
+            function_type_to_string(&vstr, derive_pos);
             break;
         case ARRAY_DERIVE:
             dkc_vstr_append_string(&vstr, "[]");
@@ -313,4 +540,31 @@ dkc_expression_to_string(Expression *expr)
     dvm_wcscpy(new_str, wc_buf);
 
     return new_str;
+}
+
+char *
+dkc_package_name_to_string(PackageName *src)
+{
+    int len = 0;
+    PackageName *pos;
+    char *dest;
+
+    if (src == NULL) {
+        return NULL;
+    }
+    for (pos = src; pos; pos = pos->next) {
+        len += strlen(pos->name) + 1;
+    }
+
+
+    dest = MEM_malloc(len);
+    dest[0] = '\0';
+    for (pos = src; pos; pos = pos->next) {
+        strcat(dest, pos->name);
+        if (pos->next) {
+            strcat(dest, ".");
+        }
+    }
+
+    return dest;
 }

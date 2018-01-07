@@ -1,5 +1,10 @@
 #include "share.h"
 
+DVM_ObjectRef dvm_null_object_ref = {
+    NULL,
+    NULL
+};
+
 OpcodeInfo dvm_opcode_info[] = {
     {"dummy", "", 0},
     {"push_int_1byte", "b", 1},
@@ -32,6 +37,13 @@ OpcodeInfo dvm_opcode_info[] = {
     {"pop_array_double", "", -1},
     {"pop_array_object", "", -1},
     /**********/
+    {"push_field_int", "s", 1},
+    {"push_field_double", "s", 1},
+    {"push_field_object", "s", 1},
+    {"pop_field_int", "s", -1},
+    {"pop_field_double", "s", -1},
+    {"pop_field_object", "s", -1},
+    /**********/
     {"add_int", "", -1},
     {"add_double", "", -1},
     {"add_string", "", -1},
@@ -52,6 +64,8 @@ OpcodeInfo dvm_opcode_info[] = {
     {"cast_boolean_to_string", "", 0},
     {"cast_int_to_string", "", 0},
     {"cast_double_to_string", "", 0},
+    {"up_cast", "s", 0},
+    {"down_cast", "s", 0},
     {"eq_int", "", -1},
     {"eq_double", "", -1},
     {"eq_object", "", -1},
@@ -77,16 +91,21 @@ OpcodeInfo dvm_opcode_info[] = {
     {"logical_not", "", 0},
     {"pop", "", -1},
     {"duplicate", "", 1},
+    {"duplicate_offset", "s", 1},
     {"jump", "s", 0},
     {"jump_if_true", "s", -1},
     {"jump_if_false", "s", -1},
     /**********/
-    {"push_function", "s", 0},
+    {"push_function", "s", 1},
+    {"push_method", "s", 1},
     {"invoke", "", -1},
     {"return", "", -1},
     /**********/
+    {"new", "s", 1},
     {"new_array", "bs", 0},
     {"new_array_literal_int", "s", 1},
     {"new_array_literal_double", "s", 1},
     {"new_array_literal_object", "s", 1},
+    {"super", "", 0},
+    {"instanceof", "s", 0},
 };

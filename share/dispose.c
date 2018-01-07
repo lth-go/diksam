@@ -47,10 +47,45 @@ dispose_local_variable(int local_variable_count,
     MEM_free(local_variable);
 }
 
+static void
+dispose_class(DVM_Class *cd)
+{
+    int i;
+
+    for (i = 0; i < cd->field_count; i++) {
+        MEM_free(cd->field[i].name);
+        dispose_type_specifier(cd->field[i].type);
+    }
+    MEM_free(cd->field);
+
+    for (i = 0; i < cd->method_count; i++) {
+        MEM_free(cd->method[i].name);
+    }
+    MEM_free(cd->method);
+
+    if (cd->super_class) {
+        MEM_free(cd->super_class->package_name);
+        MEM_free(cd->super_class->name);
+        MEM_free(cd->super_class);
+    }
+
+    for (i = 0; i < cd->interface_count; i++) {
+        MEM_free(cd->interface_[i].package_name);
+        MEM_free(cd->interface_[i].name);
+    }
+    MEM_free(cd->interface_);
+
+    MEM_free(cd->package_name);
+    MEM_free(cd->name);
+}
+
 void
 dvm_dispose_executable(DVM_Executable *exe)
 {
     int i;
+
+    MEM_free(exe->package_name);
+    MEM_free(exe->path);
 
     for (i = 0; i < exe->constant_pool_count; i++) {
         if (exe->constant_pool[i].tag == DVM_CONSTANT_STRING) {
@@ -66,8 +101,9 @@ dvm_dispose_executable(DVM_Executable *exe)
     MEM_free(exe->global_variable);
 
     for (i = 0; i < exe->function_count; i++) {
-        dispose_type_specifier(exe->function[i].type);
         MEM_free(exe->function[i].name);
+        MEM_free(exe->function[i].package_name);
+        dispose_type_specifier(exe->function[i].type);
         dispose_local_variable(exe->function[i].parameter_count,
                                exe->function[i].parameter);
         if (exe->function[i].is_implemented) {
@@ -83,6 +119,11 @@ dvm_dispose_executable(DVM_Executable *exe)
         dispose_type_derive(&exe->type_specifier[i]);
     }
     MEM_free(exe->type_specifier);
+
+    for (i = 0; i < exe->class_count; i++) {
+        dispose_class(&exe->class_definition[i]);
+    }
+    MEM_free(exe->class_definition);
 
     MEM_free(exe->code);
     MEM_free(exe->line_number);
