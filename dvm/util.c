@@ -56,17 +56,21 @@ dvm_initialize_value(DVM_TypeSpecifier *type, DVM_Value *value)
         case DVM_VOID_TYPE:  /* FALLTHRU */
         case DVM_BOOLEAN_TYPE: /* FALLTHRU */
         case DVM_INT_TYPE: /* FALLTHRU */
+        case DVM_ENUM_TYPE: /* FALLTHRU */
             value->int_value = 0;
             break;
         case DVM_DOUBLE_TYPE:
             value->double_value = 0.0;
             break;
         case DVM_STRING_TYPE: /* FALLTHRU */
+        case DVM_NATIVE_POINTER_TYPE: /* FALLTHRU */
         case DVM_CLASS_TYPE: /* FALLTHRU */
+        case DVM_DELEGATE_TYPE:
             value->object = dvm_null_object_ref;
             break;
         case DVM_NULL_TYPE: /* FALLTHRU */
         case DVM_BASE_TYPE: /* FALLTHRU */
+        case DVM_UNSPECIFIED_IDENTIFIER_TYPE: /* FALLTHRU */
         default:
             DBG_assert(0, ("basic_type..%d", type->basic_type));
         }

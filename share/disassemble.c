@@ -40,7 +40,9 @@ dump_parameter_list(DVM_Executable *exe,
 
     printf("(");
     for (i = 0; i < parameter_count; i++) {
+        /*
         dump_type(exe, parameter_list[i].type);
+        */
         printf(" %s", parameter_list[i].name);
         if (i < parameter_count-1) {
             printf(", ");
@@ -70,13 +72,23 @@ dump_type(DVM_Executable *exe, DVM_TypeSpecifier *type)
     case DVM_STRING_TYPE:
         printf("string ");
         break;
+    case DVM_NATIVE_POINTER_TYPE:
+        printf("native_pointer ");
+        break;
     case DVM_CLASS_TYPE:
-        printf("<%s> ", exe->class_definition[type->class_index].name);
+        printf("<%s> ", exe->class_definition[type->u.class_t.index].name);
+        break;
+    case DVM_DELEGATE_TYPE:
+        printf("delegate ");
+        break;
+    case DVM_ENUM_TYPE:
+        printf("<%s> ", exe->enum_definition[type->u.enum_t.index].name);
         break;
     case DVM_NULL_TYPE:
         printf("null ");
         break;
     case DVM_BASE_TYPE: /* FALLTHRU */
+    case DVM_UNSPECIFIED_IDENTIFIER_TYPE:
     default:
         DBG_assert(0, ("basic_type..%d\n", type->basic_type));
     }
@@ -183,10 +195,11 @@ dump_function(DVM_Executable *exe, int function_count, DVM_Function *function)
                             function[i].parameter);
         printf("\n");
         if (function[i].is_implemented) {
-            if (function[i].code_size > 0) {
-                dump_opcode(function[i].code_size, function[i].code);
-                dump_line_number(function[i].line_number_size,
-                                 function[i].line_number);
+            if (function[i].code_block.code_size > 0) {
+                dump_opcode(function[i].code_block.code_size,
+                            function[i].code_block.code);
+                dump_line_number(function[i].code_block.line_number_size,
+                                 function[i].code_block.line_number);
             }
         }
         printf("*** end of %s ***\n", function[i].name);
@@ -214,6 +227,7 @@ dvm_disassemble(DVM_Executable *exe)
     dump_function(exe, exe->function_count, exe->function);
     dump_types(exe, exe->type_specifier_count, exe->type_specifier);
     printf("** toplevel ********************\n");
-    dump_opcode(exe->code_size, exe->code);
-    dump_line_number(exe->line_number_size, exe->line_number);
+    dump_opcode(exe->top_level.code_size, exe->top_level.code);
+    dump_line_number(exe->top_level.line_number_size,
+                     exe->top_level.line_number);
 }

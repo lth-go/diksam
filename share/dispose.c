@@ -48,6 +48,20 @@ dispose_local_variable(int local_variable_count,
 }
 
 static void
+dispose_code_block(DVM_CodeBlock *cb)
+{
+    int try_idx;
+
+    MEM_free(cb->code);
+    MEM_free(cb->line_number);
+
+    for (try_idx = 0; try_idx < cb->try_size; try_idx++) {
+        MEM_free(cb->try[try_idx].catch_clause);
+    }
+    MEM_free(cb->try);
+}
+
+static void
 dispose_class(DVM_Class *cd)
 {
     int i;
@@ -77,6 +91,33 @@ dispose_class(DVM_Class *cd)
 
     MEM_free(cd->package_name);
     MEM_free(cd->name);
+
+    if (cd->is_implemented) {
+        dispose_code_block(&cd->field_initializer);
+    }
+}
+
+static void
+dispose_constant(DVM_Constant *constant)
+{
+    MEM_free(constant->package_name);
+    MEM_free(constant->name);
+}
+
+static void
+dispose_enum(DVM_Enum *enum_type)
+{
+    int i;
+
+    MEM_free(enum_type->package_name);
+    MEM_free(enum_type->name);
+
+    for (i = 0; i < enum_type->enumerator_count; i++) {
+        MEM_free(enum_type->enumerator[i]);
+    }
+    if (enum_type->is_defined) {
+        MEM_free(enum_type->enumerator);
+    }
 }
 
 void
@@ -109,8 +150,7 @@ dvm_dispose_executable(DVM_Executable *exe)
         if (exe->function[i].is_implemented) {
             dispose_local_variable(exe->function[i].local_variable_count,
                                    exe->function[i].local_variable);
-            MEM_free(exe->function[i].code);
-            MEM_free(exe->function[i].line_number);
+            dispose_code_block(&exe->function[i].code_block);
         }
     }
     MEM_free(exe->function);
@@ -125,7 +165,17 @@ dvm_dispose_executable(DVM_Executable *exe)
     }
     MEM_free(exe->class_definition);
 
-    MEM_free(exe->code);
-    MEM_free(exe->line_number);
+    for (i = 0; i < exe->constant_count; i++) {
+        dispose_constant(&exe->constant_definition[i]);
+    }
+    MEM_free(exe->constant_definition);
+
+    for (i = 0; i < exe->enum_count; i++) {
+        dispose_enum(&exe->enum_definition[i]);
+    }
+    MEM_free(exe->enum_definition);
+
+    dispose_code_block(&exe->top_level);
+    dispose_code_block(&exe->constant_initializer);
     MEM_free(exe);
 }

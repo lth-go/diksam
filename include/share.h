@@ -26,6 +26,18 @@ typedef enum {
 
 #define DIKSAM_REQUIRE_SUFFIX   (".dkh")
 #define DIKSAM_IMPLEMENTATION_SUFFIX    (".dkm")
+#define DIKSAM_STACK_TRACE_CLASS ("StackTrace")
+#define DIKSAM_PRINT_STACK_TRACE_FUNC ("Exception#print_stack_trace")
+#define EXCEPTION_CLASS_NAME ("Exception")
+#define BUG_EXCEPTION_CLASS_NAME ("BugException")
+#define RUNTIME_EXCEPTION_CLASS_NAME ("RuntimeException")
+#define ARRAY_INDEX_EXCEPTION_NAME ("ArrayIndexOutOfBoundsException")
+#define STRING_INDEX_EXCEPTION_NAME ("StringIndexOutOfBoundsException")
+#define DIVISION_BY_ZERO_EXCEPTION_NAME ("DivisionByZeroException")
+#define CLASS_CAST_EXCEPTION_NAME ("ClassCastException")
+#define MULTIBYTE_CONVERTION_EXCEPTION_NAME \
+  ("MultibyteCharacterConvertionException")
+#define NUMBER_FORMAT_EXCEPTION_NAME ("NumberFormatException")
 
 #define ARRAY_METHOD_SIZE "size"
 #define ARRAY_METHOD_RESIZE "resize"
@@ -67,11 +79,14 @@ dvm_search_file(char *search_path, char *search_file,
                 char *found_path, FILE **fp);
 DVM_Boolean dvm_compare_string(char *str1, char *str2);
 DVM_Boolean dvm_compare_package_name(char *p1, char *p2);
-char *dvm_create_method_function_name(char *class_name, char *method_name);
+char *
+dvm_create_method_function_name(char *class_name, char *method_name);
 void dvm_strncpy(char *dest, char *src, int buf_size);
+
 SearchFileStatus dkc_dynamic_compile(DKC_Compiler *compiler,
                                      char *package_name,
                                      DVM_ExecutableList *list,
                                      DVM_ExecutableItem **add_top,
                                      char *search_file);
+
 #endif  /* PRIVATE_SHARE_H_INCLUDED */

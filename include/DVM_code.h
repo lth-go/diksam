@@ -11,8 +11,12 @@ typedef enum {
     DVM_DOUBLE_TYPE,
     DVM_STRING_TYPE,
     DVM_CLASS_TYPE,
+    DVM_DELEGATE_TYPE,
+    DVM_ENUM_TYPE,
     DVM_NULL_TYPE,
-    DVM_BASE_TYPE
+    DVM_NATIVE_POINTER_TYPE,
+    DVM_BASE_TYPE,
+    DVM_UNSPECIFIED_IDENTIFIER_TYPE
 } DVM_BasicType;
 
 typedef struct DVM_TypeSpecifier_tag DVM_TypeSpecifier;
@@ -45,7 +49,17 @@ typedef struct DVM_TypeDerive_tag {
 
 struct DVM_TypeSpecifier_tag {
     DVM_BasicType       basic_type;
-    int                 class_index;
+    union {
+        struct {
+            int index;
+        } class_t;
+        struct {
+            int dummy;
+        } delegate_t;
+        struct {
+            int index;
+        } enum_t;
+    } u;
     int                 derive_count;
     DVM_TypeDerive      *derive;
 };
@@ -77,12 +91,21 @@ typedef enum {
     DVM_POP_STATIC_DOUBLE,
     DVM_POP_STATIC_OBJECT,
     /**********/
+    DVM_PUSH_CONSTANT_INT,
+    DVM_PUSH_CONSTANT_DOUBLE,
+    DVM_PUSH_CONSTANT_OBJECT,
+    DVM_POP_CONSTANT_INT,
+    DVM_POP_CONSTANT_DOUBLE,
+    DVM_POP_CONSTANT_OBJECT,
+    /**********/
     DVM_PUSH_ARRAY_INT,
     DVM_PUSH_ARRAY_DOUBLE,
     DVM_PUSH_ARRAY_OBJECT,
     DVM_POP_ARRAY_INT,
     DVM_POP_ARRAY_DOUBLE,
     DVM_POP_ARRAY_OBJECT,
+    /**********/
+    DVM_PUSH_CHARACTER_IN_STRING,
     /**********/
     DVM_PUSH_FIELD_INT,
     DVM_PUSH_FIELD_DOUBLE,
@@ -102,8 +125,12 @@ typedef enum {
     DVM_DIV_DOUBLE,
     DVM_MOD_INT,
     DVM_MOD_DOUBLE,
+    DVM_BIT_AND,
+    DVM_BIT_OR,
+    DVM_BIT_XOR,
     DVM_MINUS_INT,
     DVM_MINUS_DOUBLE,
+    DVM_BIT_NOT,
     DVM_INCREMENT,
     DVM_DECREMENT,
     DVM_CAST_INT_TO_DOUBLE,
@@ -111,6 +138,7 @@ typedef enum {
     DVM_CAST_BOOLEAN_TO_STRING,
     DVM_CAST_INT_TO_STRING,
     DVM_CAST_DOUBLE_TO_STRING,
+    DVM_CAST_ENUM_TO_STRING,
     DVM_UP_CAST,
     DVM_DOWN_CAST,
     DVM_EQ_INT,
@@ -145,7 +173,10 @@ typedef enum {
     /**********/
     DVM_PUSH_FUNCTION,
     DVM_PUSH_METHOD,
+    DVM_PUSH_DELEGATE,
+    DVM_PUSH_METHOD_DELEGATE,
     DVM_INVOKE,
+    DVM_INVOKE_DELEGATE,
     DVM_RETURN,
     /**********/
     DVM_NEW,
@@ -154,7 +185,11 @@ typedef enum {
     DVM_NEW_ARRAY_LITERAL_DOUBLE,
     DVM_NEW_ARRAY_LITERAL_OBJECT,
     DVM_SUPER,
-    DVM_INSTANCEOF
+    DVM_INSTANCEOF,
+    DVM_THROW,
+    DVM_RETHROW,
+    DVM_GO_FINALLY,
+    DVM_FINALLY_END
 } DVM_Opcode;
 
 typedef enum {
@@ -184,6 +219,31 @@ typedef struct {
 } DVM_LineNumber;
 
 typedef struct {
+    int class_index;
+    int start_pc;
+    int end_pc;
+} DVM_CatchClause;
+
+typedef struct {
+    int                 try_start_pc;
+    int                 try_end_pc;
+    int                 catch_count;
+    DVM_CatchClause     *catch_clause;
+    int                 finally_start_pc;
+    int                 finally_end_pc;
+} DVM_Try;
+
+typedef struct {
+    int                 code_size;
+    DVM_Byte            *code;
+    int                 line_number_size;
+    DVM_LineNumber      *line_number;
+    int                 try_size;
+    DVM_Try             *try;
+    int                 need_stack_size;
+} DVM_CodeBlock;
+
+typedef struct {
     DVM_TypeSpecifier   *type;
     char                *package_name;
     char                *name;
@@ -193,11 +253,7 @@ typedef struct {
     DVM_Boolean         is_method;
     int                 local_variable_count;
     DVM_LocalVariable   *local_variable;
-    int                 code_size;
-    DVM_Byte            *code;
-    int                 line_number_size;
-    DVM_LineNumber      *line_number;
-    int                 need_stack_size;
+    DVM_CodeBlock       code_block;
 } DVM_Function;
 
 typedef enum {
@@ -244,8 +300,23 @@ typedef struct {
     DVM_Field                   *field;
     int                         method_count;
     DVM_Method                  *method;
+    DVM_CodeBlock               field_initializer;
 } DVM_Class;
 
+typedef struct {
+    char        *package_name;
+    char        *name;
+    DVM_Boolean is_defined;
+    int         enumerator_count;
+    char        **enumerator;
+} DVM_Enum;
+
+typedef struct {
+    DVM_TypeSpecifier *type;
+    char        *package_name;
+    char        *name;
+    DVM_Boolean is_defined;
+} DVM_Constant;
 
 struct DVM_Executable_tag {
     char                *package_name;
@@ -259,13 +330,14 @@ struct DVM_Executable_tag {
     DVM_Function        *function;
     int                 type_specifier_count;
     DVM_TypeSpecifier   *type_specifier;
-    int                 code_size;
-    DVM_Byte            *code;
     int                 class_count;
     DVM_Class           *class_definition;
-    int                 line_number_size;
-    DVM_LineNumber      *line_number;
-    int                 need_stack_size;
+    int                 enum_count;
+    DVM_Enum            *enum_definition;
+    int                 constant_count;
+    DVM_Constant        *constant_definition;
+    DVM_CodeBlock       top_level;
+    DVM_CodeBlock       constant_initializer;
 };
 
 typedef struct DVM_ExecutableItem_tag {

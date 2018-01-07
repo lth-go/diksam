@@ -41,6 +41,23 @@ alloc_object(DVM_VirtualMachine *dvm, ObjectType type)
     return ret;
 }
 
+static void
+add_ref_in_native_method(DVM_Context *context, DVM_ObjectRef *obj)
+{
+    RefInNativeFunc *new_ref;
+
+    new_ref = MEM_malloc(sizeof(RefInNativeFunc));
+    new_ref->object = *obj;
+    new_ref->next = context->ref_in_native_method;
+    context->ref_in_native_method = new_ref;
+}
+
+void
+DVM_add_reference_to_context(DVM_Context *context, DVM_Value value)
+{
+    add_ref_in_native_method(context, &value.object);
+}
+
 DVM_ObjectRef
 dvm_literal_to_dvm_string_i(DVM_VirtualMachine *dvm, DVM_Char *str)
 {
@@ -56,7 +73,7 @@ dvm_literal_to_dvm_string_i(DVM_VirtualMachine *dvm, DVM_Char *str)
 }
 
 DVM_ObjectRef
-DVM_create_dvm_string(DVM_VirtualMachine *dvm, DVM_Char *str)
+dvm_create_dvm_string_i(DVM_VirtualMachine *dvm, DVM_Char *str)
 {
     DVM_ObjectRef ret;
     int len;
@@ -69,6 +86,18 @@ DVM_create_dvm_string(DVM_VirtualMachine *dvm, DVM_Char *str)
     dvm->heap.current_heap_size += sizeof(DVM_Char) * (len + 1);
     ret.data->u.string.is_literal = DVM_FALSE;
     ret.data->u.string.length = len;
+
+    return ret;
+}
+
+DVM_ObjectRef
+DVM_create_dvm_string(DVM_VirtualMachine *dvm, DVM_Context *context,
+                      DVM_Char *str)
+{
+    DVM_ObjectRef ret;
+
+    ret = dvm_create_dvm_string_i(dvm, str);
+    add_ref_in_native_method(context, &ret);
 
     return ret;
 }
@@ -104,6 +133,17 @@ dvm_create_array_int_i(DVM_VirtualMachine *dvm, int size)
 }
 
 DVM_ObjectRef
+DVM_create_array_int(DVM_VirtualMachine *dvm,  DVM_Context *context,
+                     int size)
+{
+    DVM_ObjectRef ret;
+
+    ret = dvm_create_array_int_i(dvm, size);
+
+    return ret;
+}
+
+DVM_ObjectRef
 dvm_create_array_double_i(DVM_VirtualMachine *dvm, int size)
 {
     DVM_ObjectRef ret;
@@ -115,6 +155,18 @@ dvm_create_array_double_i(DVM_VirtualMachine *dvm, int size)
     for (i = 0; i < size; i++) {
         ret.data->u.array.u.double_array[i] = 0.0;
     }
+
+    return ret;
+}
+
+DVM_ObjectRef
+DVM_create_array_double(DVM_VirtualMachine *dvm, DVM_Context *context,
+                        int size)
+{
+    DVM_ObjectRef ret;
+
+    ret = dvm_create_array_double_i(dvm, size);
+    add_ref_in_native_method(context, &ret);
 
     return ret;
 }
@@ -133,6 +185,36 @@ dvm_create_array_object_i(DVM_VirtualMachine *dvm, int size)
     }
 
     return ret;
+}
+
+DVM_ObjectRef
+DVM_create_array_object(DVM_VirtualMachine *dvm, DVM_Context *context,
+                        int size)
+{
+    DVM_ObjectRef ret;
+
+    ret = dvm_create_array_object_i(dvm, size);
+    add_ref_in_native_method(context, &ret);
+
+    return ret;
+}
+
+static void
+initialize_fields(DVM_VirtualMachine *dvm, ExecClass *ec, DVM_ObjectRef obj)
+{
+    DVM_Value value;
+
+    value.object = obj;
+    dvm_push_object(dvm, value);
+
+    dvm->current_executable = ec->executable;
+    dvm->current_function = NULL;
+    dvm->pc = 0;
+    dvm_expand_stack(dvm, ec->dvm_class->field_initializer.need_stack_size);
+    dvm_execute_i(dvm, NULL, ec->dvm_class->field_initializer.code,
+                  ec->dvm_class->field_initializer.code_size, 0);
+
+    dvm_pop_object(dvm);
 }
 
 DVM_ObjectRef
@@ -155,15 +237,70 @@ dvm_create_class_object_i(DVM_VirtualMachine *dvm, int class_index)
         dvm_initialize_value(ec->field_type[i],
                              &obj.data->u.class_object.field[i]);
     }
+    initialize_fields(dvm, ec, obj);
 
     return obj;
+}
+
+DVM_ObjectRef
+DVM_create_class_object(DVM_VirtualMachine *dvm, DVM_Context *context,
+                        int class_index)
+{
+    DVM_ObjectRef ret;
+
+    ret = dvm_create_class_object_i(dvm, class_index);
+    add_ref_in_native_method(context, &ret);
+
+    return ret;
+}
+
+static DVM_ObjectRef
+create_native_pointer_i(DVM_VirtualMachine *dvm, void *pointer,
+                            DVM_NativePointerInfo *info)
+{
+    DVM_ObjectRef ret;
+
+    ret = alloc_object(dvm, NATIVE_POINTER_OBJECT);
+    ret.data->u.native_pointer.pointer = pointer;
+    ret.data->u.native_pointer.info = info;
+    ret.v_table = NULL;
+
+    return ret;
+}
+
+DVM_ObjectRef
+DVM_create_native_pointer(DVM_VirtualMachine *dvm, DVM_Context *context,
+                          void *pointer, DVM_NativePointerInfo *info)
+{
+    DVM_ObjectRef ret;
+
+    ret = create_native_pointer_i(dvm, pointer, info);
+    add_ref_in_native_method(context, &ret);
+
+    return ret;
+}
+
+DVM_ObjectRef
+dvm_create_delegate(DVM_VirtualMachine *dvm, DVM_ObjectRef object,
+                    int index)
+{
+    DVM_ObjectRef ret;
+
+    ret = alloc_object(dvm, DELEGATE_OBJECT);
+    ret.data->u.delegate.object = object;
+    ret.data->u.delegate.index = index;
+    ret.v_table = NULL;
+
+    return ret;
 }
 
 static DVM_Boolean
 is_reference_type(DVM_TypeSpecifier *type)
 {
     if (((type->basic_type == DVM_STRING_TYPE
-          || type->basic_type == DVM_CLASS_TYPE)
+          || type->basic_type == DVM_CLASS_TYPE
+          || type->basic_type == DVM_DELEGATE_TYPE
+          || type->basic_type == DVM_NATIVE_POINTER_TYPE)
          && type->derive_count == 0)
         || (type->derive_count > 0
             && type->derive[0].tag == DVM_ARRAY_DERIVE)) {
@@ -193,10 +330,31 @@ gc_mark(DVM_ObjectRef *ref)
     } else if (ref->data->type == CLASS_OBJECT) {
         ExecClass *ec = ref->v_table->exec_class;
         for (i = 0; i < ec->field_count; i++) {
+#if 0
+            if (ec->field_type[i]->basic_type == DVM_STRING_TYPE
+                || ec->field_type[i]->basic_type == DVM_CLASS_TYPE
+                || (ec->field_type[i]->derive_count > 0
+                    && ec->field_type[i]->derive[0].tag == DVM_ARRAY_DERIVE)) {
+#endif
             if (is_reference_type(ec->field_type[i])) {
                 gc_mark(&ref->data->u.class_object.field[i].object);
             }
         }
+    } else if (ref->data->type == DELEGATE_OBJECT) {
+        gc_mark(&ref->data->u.delegate.object);
+    }
+}
+
+static void
+gc_mark_ref_in_native_method(DVM_Context *context)
+{
+    RefInNativeFunc *ref;
+
+    if (context == NULL)
+        return;
+
+    for (ref = context->ref_in_native_method; ref; ref = ref->next) {
+        gc_mark(&ref->object);
     }
 }
 
@@ -212,6 +370,7 @@ gc_mark_objects(DVM_VirtualMachine *dvm)
     DVM_Object *obj;
     ExecutableEntry *ee_pos;
     int i;
+    DVM_Context *context_pos;
 
     for (obj = dvm->heap.header; obj; obj = obj->next) {
         gc_reset_mark(obj);
@@ -232,6 +391,14 @@ gc_mark_objects(DVM_VirtualMachine *dvm)
         }
     }
     gc_mark(&dvm->current_exception);
+    for (context_pos = dvm->current_context; context_pos;
+         context_pos = context_pos->next) {
+        gc_mark_ref_in_native_method(context_pos);
+    }
+    for (context_pos = dvm->free_context; context_pos;
+         context_pos = context_pos->next) {
+        gc_mark_ref_in_native_method(context_pos);
+    }
 }
 
 static DVM_Boolean
@@ -276,6 +443,14 @@ gc_dispose_object(DVM_VirtualMachine *dvm, DVM_Object *obj)
         dvm->heap.current_heap_size
             -= sizeof(DVM_Value) * obj->u.class_object.field_count;
         MEM_free(obj->u.class_object.field);
+        break;
+    case NATIVE_POINTER_OBJECT:
+        if (obj->u.native_pointer.info->finalizer) {
+            obj->u.native_pointer.info->finalizer(dvm, obj);
+            call_finalizer = DVM_TRUE;
+        }
+        break;
+    case DELEGATE_OBJECT:
         break;
     case OBJECT_TYPE_COUNT_PLUS_1:
     default:

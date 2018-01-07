@@ -3,83 +3,136 @@
 #include "DBG.h"
 #include "dvm_pri.h"
 
-static void
-check_array(DVM_ObjectRef array, int index,
-            DVM_Executable *exe, Function *func, int pc)
+static DVM_ErrorStatus
+check_array(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
+            DVM_Executable *exe, Function *func, int pc,
+            DVM_ObjectRef *exception_p)
 {
     if (array.data == NULL) {
-        dvm_error_i(exe, func, pc, NULL_POINTER_ERR,
-                    DVM_MESSAGE_ARGUMENT_END);
+        *exception_p
+            = dvm_create_exception(dvm, DVM_NULL_POINTER_EXCEPTION_NAME,
+                                   NULL_POINTER_ERR,
+                                   DVM_MESSAGE_ARGUMENT_END);
+        return DVM_ERROR;
     }
     if (index < 0 || index >= array.data->u.array.size) {
-        dvm_error_i(exe, func, pc, INDEX_OUT_OF_BOUNDS_ERR,
-                    DVM_INT_MESSAGE_ARGUMENT, "index", index,
-                    DVM_INT_MESSAGE_ARGUMENT, "size", array.data->u.array.size,
-                    DVM_MESSAGE_ARGUMENT_END);
+        *exception_p
+            = dvm_create_exception(dvm, ARRAY_INDEX_EXCEPTION_NAME,
+                                   INDEX_OUT_OF_BOUNDS_ERR,
+                                   DVM_INT_MESSAGE_ARGUMENT, "index", index,
+                                   DVM_INT_MESSAGE_ARGUMENT, "size",
+                                   array.data->u.array.size,
+                                   DVM_MESSAGE_ARGUMENT_END);
+        return DVM_ERROR;
     }
+    return DVM_SUCCESS;
 }
 
-int
-DVM_array_get_int(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index)
+DVM_ErrorStatus
+DVM_array_get_int(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
+                  int *value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
 
-    return array.data->u.array.u.int_array[index];
+    *value = array.data->u.array.u.int_array[index];
+
+    return DVM_SUCCESS;
 }
 
-double
-DVM_array_get_double(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index)
+DVM_ErrorStatus
+DVM_array_get_double(DVM_VirtualMachine *dvm, DVM_ObjectRef array,
+                     int index, double *value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
 
-    return array.data->u.array.u.double_array[index];
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
+
+    *value = array.data->u.array.u.double_array[index];
+
+    return DVM_SUCCESS;
 }
 
-DVM_ObjectRef
-DVM_array_get_object(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index)
+DVM_ErrorStatus
+DVM_array_get_object(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
+                     DVM_ObjectRef *value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
 
-    return array.data->u.array.u.object[index];
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
+
+    *value = array.data->u.array.u.object[index];
+
+    return DVM_SUCCESS;
 }
 
-void
+DVM_ErrorStatus
 DVM_array_set_int(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
-                  int value)
+                  int value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
+
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
 
     array.data->u.array.u.int_array[index] = value;
+
+    return DVM_SUCCESS;
 }
 
-void
+DVM_ErrorStatus
 DVM_array_set_double(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
-                     double value)
+                     double value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
+
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
 
     array.data->u.array.u.double_array[index] = value;
+
+    return DVM_SUCCESS;
 }
 
-void
+DVM_ErrorStatus
 DVM_array_set_object(DVM_VirtualMachine *dvm, DVM_ObjectRef array, int index,
-                     DVM_ObjectRef value)
+                     DVM_ObjectRef value, DVM_ObjectRef *exception_p)
 {
-    check_array(array, index,
-                dvm->current_executable->executable,
-                dvm->current_function, dvm->pc);
+    DVM_ErrorStatus status;
+
+    status = check_array(dvm, array, index,
+                         dvm->current_executable->executable,
+                         dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
 
     array.data->u.array.u.object[index] = value;
+
+    return DVM_SUCCESS;
 }
 
 int
@@ -253,6 +306,48 @@ DVM_string_get_string(DVM_VirtualMachine *dvm, DVM_Object *string)
     return string->u.string.string;
 }
 
+static DVM_ErrorStatus
+check_string_index(DVM_VirtualMachine *dvm, DVM_ObjectRef str, int index,
+                   DVM_Executable *exe, Function *func, int pc,
+                   DVM_ObjectRef *exception_p)
+{
+    if (is_object_null(str)) {
+        *exception_p
+            = dvm_create_exception(dvm, DVM_NULL_POINTER_EXCEPTION_NAME,
+                                   NULL_POINTER_ERR,
+                                   DVM_MESSAGE_ARGUMENT_END);
+        return DVM_ERROR;
+    }
+    if (index < 0 || index >= str.data->u.string.length) {
+        *exception_p
+            = dvm_create_exception(dvm, STRING_INDEX_EXCEPTION_NAME,
+                                   INDEX_OUT_OF_BOUNDS_ERR,
+                                   DVM_INT_MESSAGE_ARGUMENT, "index", index,
+                                   DVM_INT_MESSAGE_ARGUMENT, "size",
+                                   str.data->u.string.length,
+                                   DVM_MESSAGE_ARGUMENT_END);
+        return DVM_ERROR;
+    }
+    return DVM_SUCCESS;
+}
+
+
+DVM_ErrorStatus
+DVM_string_get_character(DVM_VirtualMachine *dvm, DVM_ObjectRef string,
+                         int index, DVM_Char *ch, DVM_ObjectRef *exception_p)
+{
+    DVM_ErrorStatus status;
+    status = check_string_index(dvm, string, index,
+                                dvm->current_executable->executable,
+                                dvm->current_function, dvm->pc, exception_p);
+    if (status != DVM_SUCCESS) {
+        return status;
+    }
+    *ch = string.data->u.string.string[index];
+
+    return DVM_SUCCESS;
+}
+
 DVM_Value
 DVM_string_substr(DVM_VirtualMachine *dvm, DVM_Object *str,
                   int pos, int len)
@@ -263,7 +358,7 @@ DVM_string_substr(DVM_VirtualMachine *dvm, DVM_Object *str,
     new_str = MEM_malloc(sizeof(DVM_Char) * (len+1));
     dvm_wcsncpy(new_str, str->u.string.string + pos, len);
     new_str[len] = L'\0';
-    ret.object = DVM_create_dvm_string(dvm, new_str);
+    ret.object = dvm_create_dvm_string_i(dvm, new_str);
 
     return ret;
 }
@@ -312,6 +407,71 @@ DVM_set_field(DVM_ObjectRef obj, int index, DVM_Value value)
     obj.data->u.class_object.field[index] = value;
 }
 
+void *
+DVM_object_get_native_pointer(DVM_Object *obj)
+{
+    DBG_assert(obj->type == NATIVE_POINTER_OBJECT,
+               ("obj->type..%d\n", obj->type));
+    return obj->u.native_pointer.pointer;
+}
+
+DVM_Boolean
+DVM_check_native_pointer_type(DVM_Object *native_pointer,
+                              DVM_NativePointerInfo *info)
+{
+    return native_pointer->u.native_pointer.info == info;
+}
+
+
+void
+DVM_object_set_native_pointer(DVM_Object *obj, void *p)
+{
+    DBG_assert(obj->type == NATIVE_POINTER_OBJECT,
+               ("obj->type..%d\n", obj->type));
+    obj->u.native_pointer.pointer = p;
+}
+
+void
+DVM_set_exception(DVM_VirtualMachine *dvm, DVM_Context *context,
+                  DVM_NativeLibInfo *lib_info,
+                  char *package_name, char *class_name,
+                  int error_id, ...)
+{
+    int class_index;
+    DVM_ObjectRef obj;
+    VString     message;
+    va_list     ap;
+    int message_index;
+    int stack_trace_index;
+
+    va_start(ap, error_id);
+    class_index = DVM_search_class(dvm, package_name, class_name);
+    obj = DVM_create_class_object(dvm, context, class_index);
+
+    dvm_format_message(lib_info->message_format, error_id,
+                       &message, ap);
+    va_end(ap);
+
+    message_index
+        = DVM_get_field_index(dvm, obj, "message");
+    obj.data->u.class_object.field[message_index].object
+        = dvm_create_dvm_string_i(dvm, message.string);
+
+    stack_trace_index
+        = DVM_get_field_index(dvm, obj, "stack_trace");
+    obj.data->u.class_object.field[stack_trace_index].object
+        = dvm_create_array_object_i(dvm, 0);
+
+    dvm->current_exception = obj;
+}
+
+void
+DVM_set_null(DVM_Value *value)
+{
+    value->object.v_table = NULL;
+    value->object.data = NULL;
+}
+
 DVM_ObjectRef
 DVM_up_cast(DVM_ObjectRef obj, int target_index)
 {
@@ -319,6 +479,16 @@ DVM_up_cast(DVM_ObjectRef obj, int target_index)
 
     ret = obj;
     ret.v_table = obj.v_table->exec_class->interface_v_table[target_index];
+
+    return ret;
+}
+
+DVM_Value
+DVM_check_exception(DVM_VirtualMachine *dvm)
+{
+    DVM_Value ret;
+
+    ret.object = dvm->current_exception;
 
     return ret;
 }

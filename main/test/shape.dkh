@@ -32,7 +32,7 @@ public class Line : Shape {
     }
 }
 
-class Circle : Shape {
+public class Circle : Shape {
     double	center_x;
     double	center_y;
     double	radius;
@@ -45,8 +45,8 @@ class Circle : Shape {
 		+ "), r.." + this.radius);
     }
 
-    override constructor initialize(double center_x, double center_y,
-				    double radius) {
+    public override constructor initialize(double center_x, double center_y,
+					   double radius) {
 	this.center_x = center_x;
 	this.center_y = center_y;
 	this.radius = radius;

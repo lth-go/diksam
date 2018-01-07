@@ -26,13 +26,15 @@ dkc_chain_declaration(DeclarationList *list, Declaration *decl)
 }
 
 Declaration *
-dkc_alloc_declaration(TypeSpecifier *type, char *identifier)
+dkc_alloc_declaration(DVM_Boolean is_final, TypeSpecifier *type,
+                      char *identifier)
 {
     Declaration *decl;
 
     decl = dkc_malloc(sizeof(Declaration));
     decl->name = identifier;
     decl->type = type;
+    decl->is_final = is_final;
     decl->variable_index = -1;
 
     return decl;
@@ -220,7 +222,8 @@ add_function_to_compiler(FunctionDefinition *fd)
 
 FunctionDefinition *
 dkc_create_function_definition(TypeSpecifier *type, char *identifier,
-                               ParameterList *parameter_list, Block *block)
+                               ParameterList *parameter_list,
+                               ExceptionList *throws, Block *block)
 {
     FunctionDefinition *fd;
     DKC_Compiler *compiler;
@@ -236,6 +239,7 @@ dkc_create_function_definition(TypeSpecifier *type, char *identifier,
     fd->local_variable_count = 0;
     fd->local_variable = NULL;
     fd->class_definition = NULL;
+    fd->throws = throws;
     fd->end_line_number = compiler->current_line_number;
     fd->next = NULL;
     if (block) {
@@ -249,7 +253,8 @@ dkc_create_function_definition(TypeSpecifier *type, char *identifier,
 
 void
 dkc_function_define(TypeSpecifier *type, char *identifier,
-                    ParameterList *parameter_list, Block *block)
+                    ParameterList *parameter_list, ExceptionList *throws,
+                    Block *block)
 {
     FunctionDefinition *fd;
 
@@ -262,7 +267,7 @@ dkc_function_define(TypeSpecifier *type, char *identifier,
         return;
     }
     fd = dkc_create_function_definition(type, identifier, parameter_list,
-                                        block);
+                                        throws, block);
 }
 
 ParameterList *
@@ -380,13 +385,12 @@ dkc_create_type_specifier(DVM_BasicType basic_type)
 }
 
 TypeSpecifier *
-dkc_create_class_type_specifier(char *identifier)
+dkc_create_identifier_type_specifier(char *identifier)
 {
     TypeSpecifier *type;
 
-    type = dkc_alloc_type_specifier(DVM_CLASS_TYPE);
-    type->class_ref.identifier = identifier;
-    type->class_ref.class_definition = NULL;
+    type = dkc_alloc_type_specifier(DVM_UNSPECIFIED_IDENTIFIER_TYPE);
+    type->identifier = identifier;
     type->line_number = dkc_get_current_compiler()->current_line_number;
 
     return type;
@@ -478,6 +482,17 @@ dkc_create_logical_not_expression(Expression *operand)
 
     exp = dkc_alloc_expression(LOGICAL_NOT_EXPRESSION);
     exp->u.logical_not = operand;
+
+    return exp;
+}
+
+Expression *
+dkc_create_bit_not_expression(Expression *operand)
+{
+    Expression  *exp;
+
+    exp = dkc_alloc_expression(BIT_NOT_EXPRESSION);
+    exp->u.bit_not = operand;
 
     return exp;
 }
@@ -741,6 +756,45 @@ dkc_create_elsif(Expression *expr, Block *block)
 }
 
 Statement *
+dkc_create_switch_statement(Expression *expression,
+                            CaseList *case_list, Block *default_block)
+{
+    Statement *st;
+
+    st = dkc_alloc_statement(SWITCH_STATEMENT);
+    st->u.switch_s.expression = expression;
+    st->u.switch_s.case_list = case_list;
+    st->u.switch_s.default_block = default_block;
+
+    return st;
+}
+
+CaseList *
+dkc_create_one_case(ExpressionList *expression_list, Block *block)
+{
+    CaseList *case_list;
+
+    case_list = dkc_malloc(sizeof(CaseList));
+    case_list->expression_list = expression_list;
+    case_list->block = block;
+    case_list->next = NULL;
+
+    return case_list;
+}
+
+CaseList *
+dkc_chain_case(CaseList *list, CaseList *add)
+{
+    CaseList *pos;
+
+    for (pos = list; pos->next; pos = pos->next)
+        ;
+    pos->next = add;
+
+    return list;
+}
+
+Statement *
 dkc_create_while_statement(char *label,
                            Expression *condition, Block *block)
 {
@@ -890,16 +944,105 @@ dkc_create_continue_statement(char *label)
 }
 
 Statement *
-dkc_create_declaration_statement(TypeSpecifier *type,
+dkc_create_try_statement(Block *try_block,
+                         CatchClause *catch_clause,
+                         Block *finally_block)
+{
+    Statement *st;
+
+    st = dkc_alloc_statement(TRY_STATEMENT);
+    st->u.try_s.try_block = try_block;
+    try_block->type = TRY_CLAUSE_BLOCK;
+    st->u.try_s.catch_clause = catch_clause;
+    if (finally_block) {
+        finally_block->type = FINALLY_CLAUSE_BLOCK;
+    }
+    st->u.try_s.finally_block = finally_block;
+
+    return st;
+}
+
+CatchClause *
+dkc_create_catch_clause(TypeSpecifier *type, char *variable_name,
+                        Block *block)
+{
+    CatchClause *cc;
+
+    cc = dkc_malloc(sizeof(CatchClause));
+    cc->type = type;
+    cc->variable_name = variable_name;
+    cc->block = block;
+    block->type = CATCH_CLAUSE_BLOCK;
+    cc->next = NULL;
+
+    return cc;
+}
+
+CatchClause *
+dkc_start_catch_clause(void)
+{
+    CatchClause *cc;
+
+    cc = dkc_malloc(sizeof(CatchClause));
+    cc->line_number = dkc_get_current_compiler()->current_line_number;
+    cc->next = NULL;
+
+    return cc;
+}
+
+CatchClause *
+dkc_end_catch_clause(CatchClause *catch_clause, TypeSpecifier *type,
+                     char *variable_name, Block *block)
+{
+    catch_clause->type = type;
+    catch_clause->variable_name = variable_name;
+    catch_clause->block = block;
+
+    return catch_clause;
+}
+
+CatchClause *
+dkc_chain_catch_list(CatchClause *list, CatchClause *add)
+{
+    CatchClause *pos;
+
+    for (pos = list; pos->next; pos = pos->next)
+        ;
+    pos->next = add;
+
+    return list;
+}
+
+
+Statement *
+dkc_create_throw_statement(Expression *expression)
+{
+    Statement *st;
+
+    st = dkc_alloc_statement(THROW_STATEMENT);
+    st->u.throw_s.exception = expression;
+
+    return st;
+}
+
+Statement *
+dkc_create_declaration_statement(DVM_Boolean is_final, TypeSpecifier *type,
                                  char *identifier,
                                  Expression *initializer)
 {
     Statement *st;
     Declaration *decl;
+    DKC_Compiler *compiler = dkc_get_current_compiler();
 
+    if (is_final && initializer == NULL) {
+        dkc_compile_error(compiler->current_line_number,
+                          FINAL_VARIABLE_WITHOUT_INITIALIZER_ERR,
+                          STRING_MESSAGE_ARGUMENT, "name", identifier,
+                          MESSAGE_ARGUMENT_END);
+    }
     st = dkc_alloc_statement(DECLARATION_STATEMENT);
 
-    decl = dkc_alloc_declaration(type, identifier);
+    decl = dkc_alloc_declaration(is_final, type, identifier);
 
     decl->initializer = initializer;
 
@@ -1170,12 +1313,12 @@ dkc_create_method_member(ClassOrMemberModifierList *modifier,
 FunctionDefinition *
 dkc_method_function_define(TypeSpecifier *type, char *identifier,
                            ParameterList *parameter_list,
-                           Block *block)
+                           ExceptionList *throws, Block *block)
 {
     FunctionDefinition *fd;
 
     fd = dkc_create_function_definition(type, identifier, parameter_list,
-                                        block);
+                                        throws, block);
 
     return fd;
 }
@@ -1183,27 +1326,166 @@ dkc_method_function_define(TypeSpecifier *type, char *identifier,
 FunctionDefinition *
 dkc_constructor_function_define(char *identifier,
                                 ParameterList *parameter_list,
-                                Block *block)
+                                ExceptionList *throws, Block *block)
 {
     FunctionDefinition *fd;
     TypeSpecifier *type;
 
     type = dkc_create_type_specifier(DVM_VOID_TYPE);
     fd = dkc_method_function_define(type, identifier, parameter_list,
-                                    block);
+                                    throws, block);
 
     return fd;
 }
 
 MemberDeclaration *
 dkc_create_field_member(ClassOrMemberModifierList *modifier,
-                        TypeSpecifier *type, char *name)
+                        DVM_Boolean is_final, TypeSpecifier *type, char *name,
+                        Expression *initializer)
 {
     MemberDeclaration *ret;
 
     ret = alloc_member_declaration(FIELD_MEMBER, modifier);
     ret->u.field.name = name;
     ret->u.field.type = type;
+    ret->u.field.initializer = initializer;
+    ret->u.field.is_final = is_final;
 
     return ret;
+}
+
+ExceptionList *
+dkc_create_throws(char *identifier)
+{
+    ExceptionList *list;
+
+    list = dkc_malloc(sizeof(ExceptionList));
+    list->ref = dkc_malloc(sizeof(ExceptionRef));
+    list->ref->identifier = identifier;
+    list->ref->class_definition = NULL;
+    list->ref->line_number = dkc_get_current_compiler()->current_line_number;
+    list->next = NULL;
+
+    return list;
+}
+
+ExceptionList *
+dkc_chain_exception_list(ExceptionList *list, char *identifier)
+{
+    ExceptionList *pos;
+
+    for (pos = list; pos->next; pos = pos->next)
+        ;
+    pos->next = dkc_create_throws(identifier);
+
+    return list;
+}
+
+void
+dkc_create_delegate_definition(TypeSpecifier *type, char *identifier,
+                               ParameterList *parameter_list,
+                               ExceptionList *throws)
+{
+    DelegateDefinition *dd;
+    DelegateDefinition *pos;
+    DKC_Compiler *compiler = dkc_get_current_compiler();
+
+    dd = dkc_malloc(sizeof(DelegateDefinition));
+    dd->type = type;
+    dd->name = identifier;
+    dd->parameter_list = parameter_list;
+    dd->throws = throws;
+    dd->next = NULL;
+
+    if (compiler->delegate_definition_list == NULL) {
+        compiler->delegate_definition_list = dd;
+    } else {
+        for (pos = compiler->delegate_definition_list; pos->next;
+             pos = pos->next)
+            ;
+        pos->next = dd;
+    }
+}
+
+void
+dkc_create_enum_definition(char *identifier, Enumerator *enumerator)
+{
+    EnumDefinition *ed;
+    EnumDefinition *pos;
+    DKC_Compiler *compiler = dkc_get_current_compiler();
+    int value;
+    Enumerator *enumerator_pos;
+
+    ed = dkc_malloc(sizeof(EnumDefinition));
+    ed->package_name = compiler->package_name;
+    ed->name = identifier;
+    ed->enumerator = enumerator;
+    ed->next = NULL;
+
+    value = 0;
+    for (enumerator_pos = enumerator; enumerator_pos;
+         enumerator_pos = enumerator_pos->next) {
+        enumerator_pos->value = value;
+        value++;
+    }
+
+    if (compiler->enum_definition_list == NULL) {
+        compiler->enum_definition_list = ed;
+    } else {
+        for (pos = compiler->enum_definition_list; pos->next;
+             pos = pos->next)
+            ;
+        pos->next = ed;
+    }
+}
+
+Enumerator *
+dkc_create_enumerator(char *identifier)
+{
+    Enumerator *enumerator;
+
+    enumerator = dkc_malloc(sizeof(Enumerator));
+    enumerator->name = identifier;
+    enumerator->value = UNDEFINED_ENUMERATOR;
+    enumerator->next = NULL;
+
+    return enumerator;
+}
+
+Enumerator *
+dkc_chain_enumerator(Enumerator *enumerator, char *identifier)
+{
+    Enumerator *pos;
+
+    for (pos = enumerator; pos->next; pos = pos->next)
+        ;
+    pos->next = dkc_create_enumerator(identifier);
+
+    return enumerator;
+}
+
+void
+dkc_create_const_definition(TypeSpecifier *type, char *identifier,
+                            Expression *initializer)
+{
+    ConstantDefinition *cd;
+    ConstantDefinition *pos;
+    DKC_Compiler *compiler = dkc_get_current_compiler();
+    
+    cd = dkc_malloc(sizeof(ConstantDefinition));
+    cd->type = type;
+    cd->package_name = compiler->package_name;
+    cd->name = identifier;
+    cd->initializer = initializer;
+    cd->line_number = compiler->current_line_number;
+    cd->next = NULL;
+
+    if (compiler->constant_definition_list == NULL) {
+        compiler->constant_definition_list = cd;
+    } else {
+        for (pos = compiler->constant_definition_list; pos->next;
+             pos = pos->next)
+            ;
+        pos->next = cd;
+    }
 }

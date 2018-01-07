@@ -163,12 +163,13 @@ dvm_conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
 
     if (func) {
         line_number
-            = exe->function[func->u.diksam_f.index].line_number;
+            = exe->function[func->u.diksam_f.index].code_block.line_number;
         line_number_size
-            = exe->function[func->u.diksam_f.index].line_number_size;
+            = exe->function[func->u.diksam_f.index]
+            .code_block.line_number_size;
     } else {
-        line_number = exe->line_number;
-        line_number_size = exe->line_number_size;
+        line_number = exe->top_level.line_number;
+        line_number_size = exe->top_level.line_number_size;
     }
 
     for (i = 0; i < line_number_size; i++) {
@@ -182,14 +183,15 @@ dvm_conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc)
 }
 
 static void
-error_v(DVM_Executable *exe, Function *func, int pc,
-        DVM_ErrorDefinition *error_def, RuntimeError id, va_list ap)
+error_v(DVM_Executable *exe, Function *func, int pc, RuntimeError id,
+        va_list ap)
 {
     VString     message;
     int         line_number;
 
     dvm_vstr_clear(&message);
-    format_message(&error_def[id], &message, ap);
+    format_message(&dvm_error_message_format[id],
+                   &message, ap);
 
     if (pc != NO_LINE_NUMBER_PC) {
         line_number = dvm_conv_pc_to_line_number(exe, func, pc);
@@ -206,22 +208,21 @@ dvm_error_i(DVM_Executable *exe, Function *func, int pc,
 
     self_check();
     va_start(ap, id);
-    error_v(exe, func, pc, dvm_error_message_format, id, ap);
+    error_v(exe, func, pc, id, ap);
     va_end(ap);
 
     exit(1);
 }
 
 void
-dvm_error_n(DVM_VirtualMachine *dvm, DVM_ErrorDefinition *error_def,
-            RuntimeError id, ...)
+dvm_error_n(DVM_VirtualMachine *dvm, RuntimeError id, ...)
 {
     va_list     ap;
 
     self_check();
     va_start(ap, id);
     error_v(dvm->current_executable->executable,
-            dvm->current_function, dvm->pc, error_def, id, ap);
+            dvm->current_function, dvm->pc, id, ap);
     va_end(ap);
 
     exit(1);

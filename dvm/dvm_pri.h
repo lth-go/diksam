@@ -15,6 +15,8 @@
 
 #define NO_LINE_NUMBER_PC (-1)
 #define FUNCTION_NOT_FOUND (-1)
+#define ENUM_NOT_FOUND (-1)
+#define CONSTANT_NOT_FOUND (-1)
 #define FIELD_NOT_FOUND (-1)
 #define CALL_FROM_NATIVE (-1)
 
@@ -29,6 +31,7 @@
   ((type)->basic_type == DVM_STRING_TYPE \
    || (type)->basic_type == DVM_CLASS_TYPE \
    || (type)->basic_type == DVM_NULL_TYPE \
+   || (type)->basic_type == DVM_DELEGATE_TYPE \
    || ((type)->derive_count > 0 \
        && (type)->derive[0].tag == DVM_ARRAY_DERIVE))
 
@@ -46,6 +49,8 @@ typedef enum {
     CLASS_MULTIPLE_DEFINE_ERR,
     CLASS_NOT_FOUND_ERR,
     CLASS_CAST_ERR,
+    ENUM_MULTIPLE_DEFINE_ERR,
+    CONSTANT_MULTIPLE_DEFINE_ERR,
     DYNAMIC_LOAD_WITHOUT_PACKAGE_ERR,
     RUNTIME_ERROR_COUNT_PLUS_1
 } RuntimeError;
@@ -110,6 +115,8 @@ typedef enum {
     STRING_OBJECT = 1,
     ARRAY_OBJECT,
     CLASS_OBJECT,
+    NATIVE_POINTER_OBJECT,
+    DELEGATE_OBJECT,
     OBJECT_TYPE_COUNT_PLUS_1
 } ObjectType;
 
@@ -143,6 +150,17 @@ typedef struct {
     DVM_Value   *field;
 } DVM_ClassObject;
 
+typedef struct {
+    void                        *pointer;
+    DVM_NativePointerInfo       *info;
+} NativePointer;
+
+typedef struct {
+    DVM_ObjectRef       object;
+    int                 index; /* if object is null, function index,
+                                  else, method index*/
+} Delegate;
+
 struct DVM_Object_tag {
     ObjectType  type;
     unsigned int        marked:1;
@@ -150,6 +168,8 @@ struct DVM_Object_tag {
         DVM_String      string;
         DVM_Array       array;
         DVM_ClassObject class_object;
+        NativePointer   native_pointer;
+        Delegate        delegate;
     } u;
     struct DVM_Object_tag *prev;
     struct DVM_Object_tag *next;
@@ -195,6 +215,10 @@ struct DVM_VTable_tag {
 
 struct ExecutableEntry_tag {
     DVM_Executable *executable;
+    int         *function_table;
+    int         *class_table;
+    int         *enum_table;
+    int         *constant_table;
     Static      static_v;
     struct ExecutableEntry_tag *next;
 };
@@ -203,6 +227,7 @@ typedef struct {
     char        *package_name;
     char        *name;
     DVM_Boolean is_defined;
+    DVM_Enum    *dvm_enum;
 } Enum;
 
 typedef struct {
@@ -223,11 +248,17 @@ struct DVM_VirtualMachine_tag {
     int         function_count;
     ExecClass   **class;
     int         class_count;
+    Enum        **enums;
+    int         enum_count;
+    Constant    **constant;
+    int         constant_count;
     DVM_ExecutableList  *executable_list;
     ExecutableEntry     *executable_entry;
     ExecutableEntry     *top_level;
     DVM_VTable  *array_v_table;
     DVM_VTable  *string_v_table;
+    DVM_Context *current_context;
+    DVM_Context *free_context;
 };
 
 typedef struct RefInNativeFunc_tag {
@@ -268,6 +299,8 @@ void dvm_garbage_collect(DVM_VirtualMachine *dvm);
 /* native.c */
 void dvm_add_native_functions(DVM_VirtualMachine *dvm);
 /* load.c*/
+int dvm_search_function(DVM_VirtualMachine *dvm,
+                        char *package_name, char *name);
 void dvm_dynamic_load(DVM_VirtualMachine *dvm,
                       DVM_Executable *caller_exe, Function *caller, int pc,
                       Function *func);
@@ -280,8 +313,7 @@ void dvm_initialize_value(DVM_TypeSpecifier *type, DVM_Value *value);
 /* error.c */
 void dvm_error_i(DVM_Executable *exe, Function *func,
                  int pc, RuntimeError id, ...);
-void dvm_error_n(DVM_VirtualMachine *dvm, DVM_ErrorDefinition *error_def,
-                 RuntimeError id, ...);
+void dvm_error_n(DVM_VirtualMachine *dvm, RuntimeError id, ...);
 int dvm_conv_pc_to_line_number(DVM_Executable *exe, Function *func, int pc);
 void dvm_format_message(DVM_ErrorDefinition *error_definition,
                         int id, VString *message, va_list ap);

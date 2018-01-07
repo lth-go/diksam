@@ -2,6 +2,7 @@ TARGET = diksam
 CC=gcc
 OBJS = \
   ../compiler/compiler.o\
+  ../compiler/builtin/builtin.o\
   ../dvm/dvm.o\
   ../share/share.o\
   ../memory/mem.o\
@@ -20,6 +21,7 @@ $(TARGET):$(OBJS)
 	cd ../share; $(MAKE);
 	cd ../memory; $(MAKE);
 	cd ../debug; $(MAKE);
+	cd ../compiler/builtin; $(MAKE);
 	$(CC) $(OBJS) -o $@ -lm -lmsvcp60
 
 clean:

@@ -82,6 +82,7 @@ create_built_in_method(BuiltInMethod *src, int method_count)
             }
         }
         fd_array[i].parameter = param_list;
+        fd_array[i].throws = NULL;
     }
     return fd_array;
 }
@@ -107,11 +108,18 @@ DKC_create_compiler(void)
     compiler->function_list = NULL;
     compiler->dvm_function_count = 0;
     compiler->dvm_function = NULL;
+    compiler->dvm_enum_count = 0;
+    compiler->dvm_enum = NULL;
+    compiler->dvm_constant_count = 0;
+    compiler->dvm_constant = NULL;
     compiler->dvm_class_count = 0;
     compiler->dvm_class = NULL;
     compiler->declaration_list = NULL;
     compiler->statement_list = NULL;
     compiler->class_definition_list = NULL;
+    compiler->delegate_definition_list = NULL;
+    compiler->enum_definition_list = NULL;
+    compiler->constant_definition_list = NULL;
     compiler->current_block = NULL;
     compiler->current_line_number = 1;
     compiler->current_class_definition = NULL;
@@ -184,6 +192,24 @@ search_compiler(CompilerList *list, PackageName *package_name)
     }
 }
 
+static DVM_Boolean
+search_buitin_source(char *package_name, SourceSuffix suffix,
+                     SourceInput *input)
+{
+    int i;
+
+    for (i = 0; dkc_builtin_script[i].source_string != NULL; i++) {
+        if (dvm_compare_string(package_name,
+                               dkc_builtin_script[i].package_name)
+            && dkc_builtin_script[i].suffix == suffix) {
+            input->input_mode = STRING_INPUT_MODE;
+            input->u.string.lines = dkc_builtin_script[i].source_string;
+            return DVM_TRUE;
+        }
+    }
+    return DVM_FALSE;
+}
+
 static void
 make_search_path(int line_number, PackageName *package_name, char *buf)
 {
@@ -242,7 +268,16 @@ get_require_input(RequireList *req, char *found_path,
     char *search_path;
     char search_file[FILENAME_MAX];
     FILE *fp;
+    char *package_name;
     SearchFileStatus status;
+
+    package_name = dkc_package_name_to_string(req->package_name);
+    if (search_buitin_source(package_name, DKH_SOURCE, source_input)) {
+        MEM_free(package_name);
+        found_path[0] = '\0';
+        return;
+    }
+    MEM_free(package_name);
 
     search_path = getenv("DKM_REQUIRE_SEARCH_PATH");
     if (search_path == NULL) {
@@ -475,6 +510,11 @@ get_dynamic_load_input(char *package_name, char *found_path,
     SearchFileStatus status;
     char *search_path;
     FILE *fp;
+
+    if (search_buitin_source(package_name, DKM_SOURCE, source_input)) {
+        found_path[0] = '\0';
+        return SEARCH_FILE_SUCCESS;
+    }
 
     search_path = getenv("DKM_LOAD_SEARCH_PATH");
     if (search_path == NULL) {
