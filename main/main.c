@@ -9,7 +9,7 @@ main(int argc, char **argv)
 {
     DKC_Compiler *compiler;
     FILE *fp;
-    DVM_Executable *exe;
+    DVM_ExecutableList *list;
     DVM_VirtualMachine *dvm;
 
     if (argc < 2) {
@@ -25,12 +25,13 @@ main(int argc, char **argv)
 
     setlocale(LC_CTYPE, "");
     compiler = DKC_create_compiler();
-    exe = DKC_compile(compiler, fp);
+    list = DKC_compile(compiler, fp, argv[1]);
     dvm = DVM_create_virtual_machine();
-    DVM_add_executable(dvm,exe);
-    DVM_execute(dvm);
+    DVM_set_executable(dvm, list);
     DKC_dispose_compiler(compiler);
+    DVM_execute(dvm);
     DVM_dispose_virtual_machine(dvm);
+    DVM_dispose_executable_list(list);
 
     MEM_check_all_blocks();
     MEM_dump_blocks(stdout);

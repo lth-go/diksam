@@ -145,7 +145,7 @@ check_mark_sub(unsigned char *mark, int size)
 void
 check_mark(Header *header)
 {
-    unsigned char        *tail;
+    unsigned char       *tail;
     check_mark_sub(header->s.mark, (char*)&header[1] - (char*)header->s.mark);
     tail = ((unsigned char*)header) + header->s.size + sizeof(Header);
     check_mark_sub(tail, MARK_SIZE);

@@ -92,7 +92,7 @@ dvm_wcstombs_len(const wchar_t *src)
 }
 
 void
-dvm_wcstombs(const wchar_t *src, char *dest)
+dvm_wcstombs_i(const wchar_t *src, char *dest)
 {
     int src_idx, dest_idx;
     int status;
@@ -115,7 +115,7 @@ dvm_wcstombs_alloc(const wchar_t *src)
 
     len = dvm_wcstombs_len(src);
     ret = MEM_malloc(len + 1);
-    dvm_wcstombs(src, ret);
+    dvm_wcstombs_i(src, ret);
 
     return ret;
 }
@@ -138,13 +138,9 @@ int
 dvm_print_wcs(FILE *fp, wchar_t *str)
 {
     char *tmp;
-    int mb_len;
     int result;
 
-    mb_len = dvm_wcstombs_len(str);
-    MEM_check_all_blocks();
-    tmp = MEM_malloc(mb_len + 1);
-    dvm_wcstombs(str, tmp);
+    tmp = dvm_wcstombs_alloc(str);
     result = fprintf(fp, "%s", tmp);
     MEM_free(tmp);
 

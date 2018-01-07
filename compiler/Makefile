@@ -1,9 +1,10 @@
-TARGET = diksam
+TARGET = compiler.o
 CC=gcc
+ENCODING_FLAG = -DSHIFT_JIS_SOURCE
+CFLAGS = -c -g -Wall -ansi -Wswitch-enum -pedantic -DDEBUG -DDKM_WINDOWS $(ENCODING_FLAG)
 OBJS = \
   lex.yy.o\
   y.tab.o\
-  main.o\
   interface.o\
   create.o\
   fix_tree.o\
@@ -12,24 +13,13 @@ OBJS = \
   wchar.o\
   util.o\
   error.o\
-  error_message.o\
-  ../dvm/dvm.o\
-  ../share/share.o\
-  ../memory/mem.o\
-  ../debug/dbg.o
-
-CFLAGS = -c -g -Wall -Wswitch-enum -ansi -pedantic -DDEBUG -DSHIFT_JIS_SOURCE
+  error_message.o
 
 INCLUDES = \
-  -I/usr/local/include\
   -I../include
 
 $(TARGET):$(OBJS)
-	cd ../dvm; $(MAKE);
-	cd ../share; $(MAKE);
-	cd ../memory; $(MAKE);
-	cd ../debug; $(MAKE);
-	$(CC) $(OBJS) -o $@ -lm -lmsvcp60
+	ld -r -o $@ $(OBJS)
 
 clean:
 	rm -f *.o lex.yy.c y.tab.c y.tab.h *~
@@ -45,42 +35,35 @@ lex.yy.o: lex.yy.c diksamc.h ../include/MEM.h
 	$(CC) -c -g $*.c $(INCLUDES)
 .c.o:
 	$(CC) $(CFLAGS) $*.c $(INCLUDES)
-../memory/mem.o:
-	cd ../memory; $(MAKE);
-../debug/dbg.o:
-	cd ../debug; $(MAKE);
-../share/share.o:
-	cd ../share; $(MAKE);
-../dvm/dvm.o:
-	cd ../dvm; $(MAKE);
 ############################################################
 create.o: create.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h \
+  ../include/DVM_dev.h
 diksam.tab.o: diksam.tab.c diksamc.h ../include/MEM.h ../include/DKC.h \
- ../include/DVM_code.h ../include/DVM.h ../include/share.h
+  ../include/DVM_code.h ../include/DVM.h ../include/DVM_code.h \
+  ../include/share.h ../include/DKC.h
 error.o: error.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 error_message.o: error_message.c diksamc.h ../include/MEM.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 fix_tree.o: fix_tree.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 generate.o: generate.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 interface.o: interface.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
-main.o: main.c ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/MEM.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 string.o: string.c ../include/MEM.h diksamc.h ../include/DKC.h \
- ../include/DVM_code.h ../include/DVM.h ../include/share.h
+  ../include/DVM_code.h ../include/DVM.h ../include/DVM_code.h \
+  ../include/share.h ../include/DKC.h
 util.o: util.c ../include/MEM.h ../include/DBG.h diksamc.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
 wchar.o: wchar.c ../include/DBG.h diksamc.h ../include/MEM.h \
- ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
- ../include/share.h
+  ../include/DKC.h ../include/DVM_code.h ../include/DVM.h \
+  ../include/DVM_code.h ../include/share.h ../include/DKC.h
