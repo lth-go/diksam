@@ -8,31 +8,36 @@
     ParameterList       *parameter_list;
     ArgumentList        *argument_list;
     Expression          *expression;
+    ExpressionList      *expression_list;
     Statement           *statement;
     StatementList       *statement_list;
     Block               *block;
     Elsif               *elsif;
     AssignmentOperator  assignment_operator;
-    DVM_BasicType       type_specifier;
+    TypeSpecifier       *type_specifier;
+    DVM_BasicType       basic_type_specifier;
+    ArrayDimension      *array_dimension;
 }
 %token <expression>     INT_LITERAL
 %token <expression>     DOUBLE_LITERAL
 %token <expression>     STRING_LITERAL
 %token <expression>     REGEXP_LITERAL
 %token <identifier>     IDENTIFIER
-%token IF ELSE ELSIF WHILE FOR FOREACH RETURN_T BREAK CONTINUE
-        LP RP LC RC SEMICOLON COLON COMMA ASSIGN_T LOGICAL_AND LOGICAL_OR
+%token IF ELSE ELSIF WHILE FOR FOREACH RETURN_T BREAK CONTINUE NULL_T
+        LP RP LC RC LB RB SEMICOLON COLON COMMA ASSIGN_T LOGICAL_AND LOGICAL_OR
         EQ NE GT GE LT LE ADD SUB MUL DIV MOD TRUE_T FALSE_T EXCLAMATION DOT
         ADD_ASSIGN_T SUB_ASSIGN_T MUL_ASSIGN_T DIV_ASSIGN_T MOD_ASSIGN_T
         INCREMENT DECREMENT TRY CATCH FINALLY THROW
-        BOOLEAN_T INT_T DOUBLE_T STRING_T
+        BOOLEAN_T INT_T DOUBLE_T STRING_T NEW
 %type   <parameter_list> parameter_list
 %type   <argument_list> argument_list
 %type   <expression> expression expression_opt
         assignment_expression logical_and_expression logical_or_expression
         equality_expression relational_expression
         additive_expression multiplicative_expression
-        unary_expression postfix_expression primary_expression
+        unary_expression primary_expression primary_no_new_array
+        array_literal array_creation
+%type   <expression_list> expression_list
 %type   <statement> statement
         if_statement while_statement for_statement foreach_statement
         return_statement break_statement continue_statement try_statement
@@ -43,6 +48,9 @@
 %type   <assignment_operator> assignment_operator
 %type   <identifier> identifier_opt label_opt
 %type   <type_specifier> type_specifier
+%type   <basic_type_specifier> basic_type_specifier
+%type   <array_dimension> dimension_expression dimension_expression_list
+        dimension_list
 %%
 translation_unit
         : definition_or_statement
@@ -58,7 +66,7 @@ definition_or_statement
                 = dkc_chain_statement_list(compiler->statement_list, $1);
         }
         ;
-type_specifier
+basic_type_specifier
         : BOOLEAN_T
         {
             $$ = DVM_BOOLEAN_TYPE;
@@ -74,6 +82,16 @@ type_specifier
         | STRING_T
         {
             $$ = DVM_STRING_TYPE;
+        }
+        ;
+type_specifier
+        : basic_type_specifier
+        {
+            $$ = dkc_create_type_specifier($1);
+        }
+        | type_specifier LB RB
+        {
+            $$ = dkc_create_array_type_specifier($1);
         }
         ;
 function_definition
@@ -133,7 +151,7 @@ expression
         ;
 assignment_expression
         : logical_or_expression
-        | postfix_expression assignment_operator assignment_expression
+        | primary_expression assignment_operator assignment_expression
         {
             $$ = dkc_create_assign_expression($1, $2, $3);
         }
@@ -235,7 +253,7 @@ multiplicative_expression
         }
         ;
 unary_expression
-        : postfix_expression
+        : primary_expression
         | SUB unary_expression
         {
             $$ = dkc_create_minus_expression($2);
@@ -245,27 +263,36 @@ unary_expression
             $$ = dkc_create_logical_not_expression($2);
         }
         ;
-postfix_expression
-        : primary_expression
-        | postfix_expression LP argument_list RP
+primary_expression
+        : primary_no_new_array
+        | array_creation
+        ;
+primary_no_new_array
+        : primary_no_new_array LB expression RB
+        {
+            $$ = dkc_create_index_expression($1, $3);
+        }
+        | primary_expression DOT IDENTIFIER
+        {
+            $$ = dkc_create_member_expression($1, $3);
+        }
+        | primary_expression LP argument_list RP
         {
             $$ = dkc_create_function_call_expression($1, $3);
         }
-        | postfix_expression LP RP
+        | primary_expression LP RP
         {
             $$ = dkc_create_function_call_expression($1, NULL);
         }
-        | postfix_expression INCREMENT
+        | primary_expression INCREMENT
         {
             $$ = dkc_create_incdec_expression($1, INCREMENT_EXPRESSION);
         }
-        | postfix_expression DECREMENT
+        | primary_expression DECREMENT
         {
             $$ = dkc_create_incdec_expression($1, DECREMENT_EXPRESSION);
         }
-        ;
-primary_expression
-        : LP expression RP
+        | LP expression RP
         {
             $$ = $2;
         }
@@ -284,6 +311,69 @@ primary_expression
         | FALSE_T
         {
             $$ = dkc_create_boolean_expression(DVM_FALSE);
+        }
+        | NULL_T
+        {
+            $$ = dkc_create_null_expression();
+        }
+        | array_literal
+        ;
+array_literal
+        : LC expression_list RC
+        {
+            $$ = dkc_create_array_literal_expression($2);
+        }
+        | LC expression_list COMMA RC
+        {
+            $$ = dkc_create_array_literal_expression($2);
+        }
+        ;
+array_creation
+        : NEW basic_type_specifier dimension_expression_list
+        {
+            $$ = dkc_create_array_creation($2, $3, NULL);
+        }
+        | NEW basic_type_specifier dimension_expression_list dimension_list
+        {
+            $$ = dkc_create_array_creation($2, $3, $4);
+        }
+        ;
+dimension_expression_list
+        : dimension_expression
+        | dimension_expression_list dimension_expression
+        {
+            $$ = dkc_chain_array_dimension($1, $2);
+        }
+        ;
+dimension_expression
+        : LB expression RB
+        {
+            $$ = dkc_create_array_dimension($2);
+        }
+        ;
+dimension_list
+        : LB RB
+        {
+            $$ = dkc_create_array_dimension(NULL);
+        }
+        | dimension_list LB RB
+        {
+            $$ = dkc_chain_array_dimension($1,
+                                           dkc_create_array_dimension(NULL));
+        }
+        ;
+expression_list
+        : /* empty */
+        {
+            $$ = NULL;
+        }
+        | assignment_expression
+        {
+            $$ = dkc_create_expression_list($1);
+        }
+        | expression_list COMMA assignment_expression
+        {
+            $$ = dkc_chain_expression_list($1, $3);
         }
         ;
 statement

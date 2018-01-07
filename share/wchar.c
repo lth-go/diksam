@@ -142,6 +142,7 @@ dvm_print_wcs(FILE *fp, wchar_t *str)
     int result;
 
     mb_len = dvm_wcstombs_len(str);
+    MEM_check_all_blocks();
     tmp = MEM_malloc(mb_len + 1);
     dvm_wcstombs(str, tmp);
     result = fprintf(fp, "%s", tmp);

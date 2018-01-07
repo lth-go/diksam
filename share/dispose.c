@@ -6,7 +6,7 @@ static void dispose_local_variable(int local_variable_count,
                                    DVM_LocalVariable *local_variable_list);
 
 static void
-dispose_type_specifier(DVM_TypeSpecifier *type)
+dispose_type_derive(DVM_TypeSpecifier *type)
 {
     int i;
 
@@ -18,11 +18,19 @@ dispose_type_specifier(DVM_TypeSpecifier *type)
                                    type->derive[i].u
                                    .function_d.parameter);
             break;
+        case DVM_ARRAY_DERIVE:
+            break;
         default:
             DBG_assert(0, ("derive->tag..%d\n", type->derive[i].tag));
         }
     }
     MEM_free(type->derive);
+}
+
+static void
+dispose_type_specifier(DVM_TypeSpecifier *type)
+{
+    dispose_type_derive(type);
     MEM_free(type);
 }
 
@@ -70,6 +78,12 @@ dvm_dispose_executable(DVM_Executable *exe)
         }
     }
     MEM_free(exe->function);
+
+    for (i = 0; i < exe->type_specifier_count; i++) {
+        dispose_type_derive(&exe->type_specifier[i]);
+    }
+    MEM_free(exe->type_specifier);
+
     MEM_free(exe->code);
     MEM_free(exe->line_number);
     MEM_free(exe);

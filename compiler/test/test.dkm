@@ -591,3 +591,122 @@ println("i.." + i);
 int ii = 10;
 
 println("ii = 10.." + (ii = 10));
+
+////////////////////////////////////////////////////////////
+// Check array
+////////////////////////////////////////////////////////////
+int[][] array;
+array = null;
+
+array = new int[5][];
+array[3] = new int[3];
+array[3][0] = 10;
+
+println("array[3][0].." + array[3][0]);
+
+array = new int[9][9];
+for (i = 0; i < 9; i++) {
+    for (j = 0; j < 9; j++) {
+	array[i][j] = (i+1) * (j+1);
+    }
+}
+
+for (i = 0; i < 9; i++) {
+    for (j = 0; j < 9; j++) {
+	print(" " + array[i][j]);
+    }
+    print("\n");
+}
+
+int[] array2 = {1, 2, 3, 4, 5.0};
+
+
+for (i = 0; i < 5; i++) {
+    print("array2[" + i + "].." + array2[i] + "\n");
+}
+
+int[][] a99 = {
+    {1, 2, 3, 4, 5, 6, 7, 8, 9},
+    {2, 4, 6, 8, 10, 12, 14, 16, 18},
+    {3, 6, 9, 12, 15, 18, 21, 24, 27},
+    {4, 8, 12, 16, 20, 24, 28, 32, 36},
+    {5, 10, 15, 20, 25, 30, 35, 40, 45},
+    {6, 12, 18, 24, 30, 36, 42, 48, 54},
+    {7, 14, 21, 28, 35, 42, 49, 56, 63},
+    {8, 16, 24, 32, 40, 48, 56, 64, 72},
+    {9, 18, 27, 36, 45, 54, 63, 72, 81},
+};
+
+for (i = 0; i < 9; i++) {
+    for (j = 0; j < 9; j++) {
+	print(" " + a99[i][j]);
+    }
+    print("\n");
+}
+
+double[] darray = new double[10];
+
+for (i = 0; i < 10; i++) {
+    darray[i] = i;
+}
+
+for (i = 0; i < 10; i++) {
+    println("darray[" + i + "].." + darray[i]);
+}
+
+darray = {1.0, 2, 3, 4, 5, 6};
+for (i = 0; i < 6; i++) {
+    println("darray[" + i + "].." + darray[i]);
+}
+
+string[] sarray = new string[10];
+
+for (i = 0; i < 10; i++) {
+    sarray[i] = "str" + i;
+}
+
+for (i = 0; i < 10; i++) {
+    println("sarray[" + i + "].." + sarray[i]);
+}
+sarray = {"1", "2", "3", "4"};
+for (i = 0; i < 4; i++) {
+    println("sarray[" + i + "].." + sarray[i]);
+}
+
+////////////////////////////////////////////////////////////
+// Check null
+////////////////////////////////////////////////////////////
+string null_str = null;
+
+str_val = "abc";
+
+int[] array_val = {1, 2, 3};
+
+print("null_str.." + null_str + "\n");
+print(str_val + null_str + "\n");
+print(null_str);
+print("\n");
+
+if (null_str == null) {
+    print("OK\n");
+} else {
+    print("NG\n");
+}
+
+if (str_val != null) {
+    print("OK\n");
+} else {
+    print("NG\n");
+}
+
+if (array == null) {
+    print("NG\n");
+} else {
+    print("OK\n");
+}
+
+if (null == null) {
+    print("OK\n");
+} else {
+    print("NG\n");
+}

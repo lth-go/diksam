@@ -4,6 +4,7 @@ CFLAGS = -c -g -Wall -Wswitch-enum -ansi -pedantic -DDEBUG
 OBJS = execute.o \
   heap.o \
   native.o \
+  nativeif.o \
   wchar.o \
   util.o \
   error.o \
@@ -25,6 +26,9 @@ heap.o: heap.c ../include/MEM.h ../include/DBG.h dvm_pri.h \
  ../include/DVM_code.h ../include/DVM.h ../include/DVM_dev.h \
  ../include/share.h
 native.o: native.c ../include/MEM.h ../include/DBG.h dvm_pri.h \
+ ../include/DVM_code.h ../include/DVM.h ../include/DVM_dev.h \
+ ../include/share.h
+nativeif.o: nativeif.c ../include/MEM.h ../include/DBG.h dvm_pri.h \
  ../include/DVM_code.h ../include/DVM.h ../include/DVM_dev.h \
  ../include/share.h
 util.o: util.c ../include/MEM.h ../include/DBG.h dvm_pri.h \

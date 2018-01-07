@@ -65,6 +65,97 @@ dvm_create_dvm_string_i(DVM_VirtualMachine *dvm, DVM_Char *str)
     return ret;
 }
 
+DVM_Object *
+alloc_array(DVM_VirtualMachine *dvm, ArrayType type, int size)
+{
+    DVM_Object *ret;
+
+    ret = alloc_object(dvm, ARRAY_OBJECT);
+    ret->u.array.type = type;
+    ret->u.array.size = size;
+    ret->u.array.alloc_size = size;
+
+    return ret;
+}
+
+DVM_Object *
+dvm_create_array_int_i(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+
+    ret = alloc_array(dvm, INT_ARRAY, size);
+    ret->u.array.u.int_array = MEM_malloc(sizeof(int) * size);
+    dvm->heap.current_heap_size += sizeof(int) * size;
+
+    return ret;
+}
+
+DVM_Object *
+DVM_create_array_int(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+    int i;
+
+    ret = dvm_create_array_int_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        ret->u.array.u.int_array[i] = 0;
+    }
+
+    return ret;
+}
+
+DVM_Object *
+dvm_create_array_double_i(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+
+    ret = alloc_array(dvm, DOUBLE_ARRAY, size);
+    ret->u.array.u.double_array = MEM_malloc(sizeof(double) * size);
+    dvm->heap.current_heap_size += sizeof(double) * size;
+
+    return ret;
+}
+
+DVM_Object *
+DVM_create_array_double(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+    int i;
+
+    ret = dvm_create_array_double_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        ret->u.array.u.double_array[i] = 0.0;
+    }
+
+    return ret;
+}
+
+DVM_Object *
+dvm_create_array_object_i(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+
+    ret = alloc_array(dvm, OBJECT_ARRAY, size);
+    ret->u.array.u.object = MEM_malloc(sizeof(DVM_Object*) * size);
+    dvm->heap.current_heap_size += sizeof(DVM_Object*) * size;
+
+    return ret;
+}
+
+DVM_Object *
+DVM_create_array_object(DVM_VirtualMachine *dvm, int size)
+{
+    DVM_Object *ret;
+    int i;
+
+    ret = dvm_create_array_object_i(dvm, size);
+    for (i = 0; i < size; i++) {
+        ret->u.array.u.object[i] = NULL;
+    }
+
+    return ret;
+}
+
 static void
 gc_mark(DVM_Object *obj)
 {
@@ -75,6 +166,14 @@ gc_mark(DVM_Object *obj)
         return;
 
     obj->marked = DVM_TRUE;
+
+    if (obj->type == ARRAY_OBJECT && obj->u.array.type == OBJECT_ARRAY) {
+        int i;
+
+        for (i = 0; i < obj->u.array.size; i++) {
+            gc_mark(obj->u.array.u.object[i]);
+        }
+    }
 }
 
 static void
@@ -95,7 +194,10 @@ gc_mark_objects(DVM_VirtualMachine *dvm)
     
     for (i = 0; i < dvm->static_v.variable_count; i++) {
         if (dvm->executable->global_variable[i].type->basic_type
-            == DVM_STRING_TYPE) {
+            == DVM_STRING_TYPE
+            || (dvm->executable->global_variable[i].type->derive != NULL
+                && (dvm->executable->global_variable[i].type->derive[0].tag
+                    == DVM_ARRAY_DERIVE))) {
             gc_mark(dvm->static_v.variable[i].object);
         }
     }
@@ -116,6 +218,27 @@ gc_dispose_object(DVM_VirtualMachine *dvm, DVM_Object *obj)
             dvm->heap.current_heap_size
                 -= sizeof(DVM_Char) * (dvm_wcslen(obj->u.string.string) + 1);
             MEM_free(obj->u.string.string);
+        }
+        break;
+    case ARRAY_OBJECT:
+        switch (obj->u.array.type) {
+        case INT_ARRAY:
+            dvm->heap.current_heap_size
+                -= sizeof(int) * obj->u.array.alloc_size;
+            MEM_free(obj->u.array.u.int_array);
+            break;
+        case DOUBLE_ARRAY:
+            dvm->heap.current_heap_size
+                -= sizeof(double) * obj->u.array.alloc_size;
+            MEM_free(obj->u.array.u.double_array);
+            break;
+        case OBJECT_ARRAY:
+            dvm->heap.current_heap_size
+                -= sizeof(DVM_Object*) * obj->u.array.alloc_size;
+            MEM_free(obj->u.array.u.object);
+            break;
+        default:
+            DBG_assert(0, ("array.type..%d", obj->u.array.type));
         }
         break;
     case OBJECT_TYPE_COUNT_PLUS_1:

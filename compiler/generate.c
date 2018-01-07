@@ -37,6 +37,8 @@ alloc_executable(void)
     exe->global_variable = NULL;
     exe->function_count = 0;
     exe->function = NULL;
+    exe->type_specifier_count = 0;
+    exe->type_specifier = NULL;
     exe->code_size = 0;
     exe->code = NULL;
 
@@ -105,16 +107,13 @@ copy_local_variables(FunctionDefinition *fd, int param_count)
     return dest;
 }
 
-static DVM_TypeSpecifier *
-copy_type_specifier(TypeSpecifier *src)
+static void
+copy_type_specifier_no_alloc(TypeSpecifier *src, DVM_TypeSpecifier *dest)
 {
-    DVM_TypeSpecifier *dest;
     int derive_count = 0;
     TypeDerive *derive;
     int param_count;
     int i;
-
-    dest = MEM_malloc(sizeof(DVM_TypeSpecifier));
 
     dest->basic_type = src->basic_type;
 
@@ -126,17 +125,30 @@ copy_type_specifier(TypeSpecifier *src)
     for (i = 0, derive = src->derive; derive;
          derive = derive->next, i++) {
         switch (derive->tag) {
-        case DVM_FUNCTION_DERIVE:
+        case FUNCTION_DERIVE:
             dest->derive[i].tag = DVM_FUNCTION_DERIVE;
             dest->derive[i].u.function_d.parameter
                 = copy_parameter_list(derive->u.function_d.parameter_list,
                                       &param_count);
             dest->derive[i].u.function_d.parameter_count = param_count;
             break;
+        case ARRAY_DERIVE:
+            dest->derive[i].tag = DVM_ARRAY_DERIVE;
+            break;
         default:
             DBG_assert(0, ("derive->tag..%d\n", derive->tag));
         }
     }
+}
+
+static DVM_TypeSpecifier *
+copy_type_specifier(TypeSpecifier *src)
+{
+    DVM_TypeSpecifier *dest;
+
+    dest = MEM_malloc(sizeof(DVM_TypeSpecifier));
+
+    copy_type_specifier_no_alloc(src, dest);
 
     return dest;
 }
@@ -159,6 +171,25 @@ add_global_variable(DKC_Compiler *compiler, DVM_Executable *exe)
         exe->global_variable[i].type
             = copy_type_specifier(dl->declaration->type);
     }
+}
+
+static int
+add_type_specifier(TypeSpecifier *src, DVM_Executable *exe)
+{
+    int ret;
+
+    exe->type_specifier
+        = MEM_realloc(exe->type_specifier,
+                      sizeof(DVM_TypeSpecifier)
+                      * (exe->type_specifier_count + 1));
+    copy_type_specifier_no_alloc(src,
+                                 &exe->type_specifier
+                                 [exe->type_specifier_count]);
+
+    ret = exe->type_specifier_count;
+    exe->type_specifier_count++;
+
+    return ret;
 }
 
 static void
@@ -184,7 +215,7 @@ add_line_number(OpcodeBuf *ob, int line_number, int start_pc)
 }
 
 static void
-generate_code(OpcodeBuf *ob, int line_number, DVM_Opcode code, ...)
+generate_code(OpcodeBuf *ob, int line_number, DVM_Opcode code,  ...)
 {
     va_list     ap;
     int         i;
@@ -297,9 +328,15 @@ generate_string_expression(DVM_Executable *cf, Expression *expr,
 }
 
 static int
-get_opcode_type_offset(DVM_BasicType basic_type)
+get_opcode_type_offset(TypeSpecifier *type)
 {
-    switch (basic_type) {
+    if (type->derive != NULL) {
+        DBG_assert(type->derive->tag = ARRAY_DERIVE,
+                   ("type->derive->tag..%d", type->derive->tag));
+        return 2;
+    }
+
+    switch (type->basic_type) {
     case DVM_BOOLEAN_TYPE:
         return 0;
         break;
@@ -312,8 +349,9 @@ get_opcode_type_offset(DVM_BasicType basic_type)
     case DVM_STRING_TYPE:
         return 2;
         break;
+    case DVM_NULL_TYPE: /* FALLTHRU */
     default:
-        DBG_assert(0, ("basic_type..%d", basic_type));
+        DBG_assert(0, ("basic_type..%d", type->basic_type));
     }
 
     return 0;
@@ -331,18 +369,16 @@ generate_identifier_expression(DVM_Executable *exe, Block *block,
     }
 
     if (expr->u.identifier.u.declaration->is_local) {
-        generate_code(ob,  expr->line_number,
+        generate_code(ob, expr->line_number,
                       DVM_PUSH_STACK_INT
                       + get_opcode_type_offset(expr->u.identifier
-                                               .u.declaration
-                                               ->type->basic_type),
+                                               .u.declaration->type),
                       expr->u.identifier.u.declaration->variable_index);
     } else {
         generate_code(ob, expr->line_number,
                       DVM_PUSH_STATIC_INT
                       + get_opcode_type_offset(expr->u.identifier
-                                               .u.declaration
-                                               ->type->basic_type),
+                                               .u.declaration->type),
                       expr->u.identifier.u.declaration->variable_index);
     }
 }
@@ -357,13 +393,34 @@ generate_pop_to_identifier(Declaration *decl, int line_number,
     if (decl->is_local) {
         generate_code(ob, line_number,
                       DVM_POP_STACK_INT
-                      + get_opcode_type_offset(decl->type->basic_type),
+                      + get_opcode_type_offset(decl->type),
                       decl->variable_index);
     } else {
         generate_code(ob, line_number,
                       DVM_POP_STATIC_INT
-                      + get_opcode_type_offset(decl->type->basic_type),
+                      + get_opcode_type_offset(decl->type),
                       decl->variable_index);
+    }
+}
+
+static void
+generate_pop_to_lvalue(DVM_Executable *exe, Block *block,
+                       Expression *expr, OpcodeBuf *ob)
+{
+    if (expr->kind == IDENTIFIER_EXPRESSION) {
+        generate_pop_to_identifier(expr->u.identifier.u.declaration,
+                                   expr->line_number,
+                                   ob);
+    } else {
+        DBG_assert(expr->kind == INDEX_EXPRESSION,
+                   ("expr->kind..%d", expr->kind));
+        
+        generate_expression(exe, block, expr->u.index_expression.array, ob);
+        generate_expression(exe, block, expr->u.index_expression.index, ob);
+        generate_code(ob, expr->line_number,
+                      DVM_POP_ARRAY_INT
+                      + get_opcode_type_offset(expr->type));
+
     }
 }
 
@@ -373,39 +430,38 @@ generate_assign_expression(DVM_Executable *exe, Block *block,
                            DVM_Boolean is_toplevel)
 {
     if (expr->u.assign_expression.operator != NORMAL_ASSIGN) {
-        generate_identifier_expression(exe, block, 
-                                       expr->u.assign_expression.left,
-                                       ob);
+        generate_expression(exe, block, 
+                            expr->u.assign_expression.left, ob);
     }
     generate_expression(exe, block, expr->u.assign_expression.operand, ob);
 
     switch (expr->u.assign_expression.operator) {
-    case NORMAL_ASSIGN :
+    case NORMAL_ASSIGN : /* FALLTHRU */
         break;
     case ADD_ASSIGN:
         generate_code(ob, expr->line_number,
                       DVM_ADD_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     case SUB_ASSIGN:
         generate_code(ob, expr->line_number,
                       DVM_SUB_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     case MUL_ASSIGN:
         generate_code(ob, expr->line_number,
                       DVM_MUL_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     case DIV_ASSIGN:
         generate_code(ob, expr->line_number,
                       DVM_DIV_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     case MOD_ASSIGN:
         generate_code(ob, expr->line_number,
                       DVM_MOD_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     default:
         DBG_assert(0, ("operator..%d\n", expr->u.assign_expression.operator));
@@ -414,10 +470,8 @@ generate_assign_expression(DVM_Executable *exe, Block *block,
     if (!is_toplevel) {
         generate_code(ob, expr->line_number, DVM_DUPLICATE);
     }
-    generate_pop_to_identifier(expr->u.assign_expression.left
-                               ->u.identifier.u.declaration,
-                               expr->line_number,
-                               ob);
+    generate_pop_to_lvalue(exe, block,
+                           expr->u.assign_expression.left, ob);
 }
 
 static void
@@ -425,18 +479,26 @@ generate_binary_expression(DVM_Executable *exe, Block *block,
                            Expression *expr, DVM_Opcode code,
                            OpcodeBuf *ob)
 {
-    DBG_assert(expr->u.binary_expression.left->type->basic_type
-               == expr->u.binary_expression.right->type->basic_type,
-               ("left..%d, right..%d",
-                expr->u.binary_expression.left->type->basic_type,
-                expr->u.binary_expression.right->type->basic_type));
+    int offset;
+    Expression *left = expr->u.binary_expression.left;
+    Expression *right = expr->u.binary_expression.right;
 
-    generate_expression(exe, block, expr->u.binary_expression.left, ob);
-    generate_expression(exe, block, expr->u.binary_expression.right, ob);
+    generate_expression(exe, block, left, ob);
+    generate_expression(exe, block, right, ob);
+
+    if ((left->kind == NULL_EXPRESSION && right->kind != NULL_EXPRESSION)
+        || (left->kind != NULL_EXPRESSION && right->kind == NULL_EXPRESSION)) {
+        offset = 2; /* object type */
+
+    } else if ((code == DVM_EQ_INT || code == DVM_NE_INT)
+               && dkc_is_string(left->type)) {
+        offset = 3; /* string type */
+
+    } else {
+        offset = get_opcode_type_offset(expr->u.binary_expression.left->type);
+    }
     generate_code(ob, expr->line_number,
-                  code
-                  + get_opcode_type_offset(expr->u.binary_expression.left
-                                           ->type->basic_type));
+                  code + offset);
 }
 
 static int
@@ -522,6 +584,42 @@ generate_cast_expression(DVM_Executable *exe, Block *block,
 }
 
 static void
+generate_array_literal_expression(DVM_Executable *exe, Block *block,
+                                  Expression *expr, OpcodeBuf *ob)
+{
+    ExpressionList *pos;
+    int count;
+
+    DBG_assert(expr->type->derive
+               && expr->type->derive->tag == ARRAY_DERIVE,
+               ("array literal is not array."));
+
+    count = 0;
+    for (pos = expr->u.array_literal; pos; pos = pos->next) {
+        generate_expression(exe, block, pos->expression, ob);
+        count++;
+    }
+    DBG_assert(count > 0, ("empty array literal"));
+    
+    generate_code(ob, expr->line_number,
+                  DVM_NEW_ARRAY_LITERAL_INT
+                  + get_opcode_type_offset(expr->u.array_literal
+                                           ->expression->type),
+                  count);
+}
+
+static void
+generate_index_expression(DVM_Executable *exe, Block *block,
+                          Expression *expr, OpcodeBuf *ob)
+{
+    generate_expression(exe, block, expr->u.index_expression.array, ob);
+    generate_expression(exe, block, expr->u.index_expression.index, ob);
+
+    generate_code(ob, expr->line_number, DVM_PUSH_ARRAY_INT
+                  + get_opcode_type_offset(expr->type));
+}
+
+static void
 generate_inc_dec_expression(DVM_Executable *exe, Block *block,
                             Expression *expr, ExpressionKind kind,
                             OpcodeBuf *ob, DVM_Boolean is_toplevel)
@@ -537,10 +635,8 @@ generate_inc_dec_expression(DVM_Executable *exe, Block *block,
     if (!is_toplevel) {
         generate_code(ob, expr->line_number, DVM_DUPLICATE);
     }
-    generate_pop_to_identifier(expr->u.inc_dec.operand
-                               ->u.identifier.u.declaration,
-                               expr->line_number,
-                               ob);
+    generate_pop_to_lvalue(exe, block,
+                           expr->u.inc_dec.operand, ob);
 }
 
 static void
@@ -555,6 +651,43 @@ generate_function_call_expression(DVM_Executable *exe, Block *block,
     }
     generate_expression(exe, block, fce->function, ob);
     generate_code(ob, expr->line_number, DVM_INVOKE);
+}
+
+static void
+generate_null_expression(DVM_Executable *exe, Expression *expr,
+                         OpcodeBuf *ob)
+{
+    generate_code(ob, expr->line_number, DVM_PUSH_NULL);
+}
+
+static void
+generate_array_creation_expression(DVM_Executable *exe, Block *block,
+                                   Expression *expr, OpcodeBuf *ob)
+{
+    int index;
+    TypeSpecifier type;
+    ArrayDimension *dim_pos;
+    int dim_count;
+
+    index = add_type_specifier(expr->type, exe);
+
+    DBG_assert(expr->type->derive->tag == ARRAY_DERIVE,
+               ("expr->type->derive->tag..%d", expr->type->derive->tag));
+
+    type.basic_type = expr->type->basic_type;
+    type.derive = expr->type->derive;
+
+    dim_count = 0;
+    for (dim_pos = expr->u.array_creation.dimension;
+         dim_pos; dim_pos = dim_pos->next) {
+        if (dim_pos->expression == NULL)
+            break;
+
+        generate_expression(exe, block, dim_pos->expression, ob);
+        dim_count++;
+    }
+
+    generate_code(ob, expr->line_number, DVM_NEW_ARRAY, dim_count, index);
 }
 
 static void
@@ -639,7 +772,7 @@ generate_expression(DVM_Executable *exe, Block *current_block,
         generate_expression(exe, current_block, expr->u.minus_expression, ob);
         generate_code(ob, expr->line_number,
                       DVM_MINUS_INT
-                      + get_opcode_type_offset(expr->type->basic_type));
+                      + get_opcode_type_offset(expr->type));
         break;
     case LOGICAL_NOT_EXPRESSION:
         generate_expression(exe, current_block, expr->u.logical_not, ob);
@@ -649,6 +782,17 @@ generate_expression(DVM_Executable *exe, Block *current_block,
         generate_function_call_expression(exe, current_block,
                                           expr, ob);
         break;
+    case MEMBER_EXPRESSION:
+        break;
+    case NULL_EXPRESSION:
+        generate_null_expression(exe, expr, ob);
+        break;
+    case ARRAY_LITERAL_EXPRESSION:
+        generate_array_literal_expression(exe, current_block, expr, ob);
+        break;
+    case INDEX_EXPRESSION:
+        generate_index_expression(exe, current_block, expr, ob);
+        break;
     case INCREMENT_EXPRESSION:  /* FALLTHRU */
     case DECREMENT_EXPRESSION:
         generate_inc_dec_expression(exe, current_block, expr, expr->kind,
@@ -656,6 +800,9 @@ generate_expression(DVM_Executable *exe, Block *current_block,
         break;
     case CAST_EXPRESSION:
         generate_cast_expression(exe, current_block, expr, ob);
+        break;
+    case ARRAY_CREATION_EXPRESSION:
+        generate_array_creation_expression(exe, current_block, expr, ob);
         break;
     case EXPRESSION_KIND_COUNT_PLUS_1:  /* FALLTHRU */
     default:
@@ -705,8 +852,8 @@ generate_if_statement(DVM_Executable *exe, Block *block,
     for (elsif = if_s->elsif_list; elsif; elsif = elsif->next) {
         generate_expression(exe, block, elsif->condition, ob);
         if_false_label = get_label(ob);
-        generate_code(ob, statement->line_number, DVM_JUMP_IF_FALSE,
-                      if_false_label);
+        generate_code(ob, statement->line_number,
+                      DVM_JUMP_IF_FALSE, if_false_label);
         generate_statement_list(exe, elsif->block,
                                 elsif->block->statement_list, ob);
         generate_code(ob, statement->line_number, DVM_JUMP, end_label);
@@ -902,7 +1049,8 @@ generate_initializer(DVM_Executable *exe, Block *block,
         return;
 
     generate_expression(exe, block, decl->initializer, ob);
-    generate_pop_to_identifier(decl, statement->line_number, ob);
+    generate_pop_to_identifier(decl, statement->line_number,
+                               ob);
 }
 
 static void
@@ -1014,6 +1162,24 @@ fix_opcode_buf(OpcodeBuf *ob)
     return ret;
 }
 
+static void
+copy_function(FunctionDefinition *src, DVM_Function *dest)
+{
+    dest->type = copy_type_specifier(src->type);
+    dest->name = MEM_strdup(src->name);
+    dest->parameter = copy_parameter_list(src->parameter,
+                                          &dest->parameter_count);
+    if (src->block) {
+        dest->local_variable
+            = copy_local_variables(src, dest->parameter_count);
+        dest->local_variable_count
+            = src->local_variable_count - dest->parameter_count;
+    } else {
+        dest->local_variable = NULL;
+        dest->local_variable_count = 0;
+    }
+}
+
 static int
 calc_need_stack_size(DVM_Byte *code, int code_size)
 {
@@ -1042,24 +1208,6 @@ calc_need_stack_size(DVM_Byte *code, int code_size)
     }
 
     return stack_size;
-}
-
-static void
-copy_function(FunctionDefinition *src, DVM_Function *dest)
-{
-    dest->type = copy_type_specifier(src->type);
-    dest->name = MEM_strdup(src->name);
-    dest->parameter = copy_parameter_list(src->parameter,
-                                          &dest->parameter_count);
-    if (src->block) {
-        dest->local_variable
-            = copy_local_variables(src, dest->parameter_count);
-        dest->local_variable_count
-            = src->local_variable_count - dest->parameter_count;
-    } else {
-        dest->local_variable = NULL;
-        dest->local_variable_count = 0;
-    }
 }
 
 static void
@@ -1110,6 +1258,8 @@ add_top_level(DKC_Compiler *compiler, DVM_Executable *exe)
     exe->code = fix_opcode_buf(&ob);
     exe->line_number_size = ob.line_number_size;
     exe->line_number = ob.line_number;
+
+
     exe->need_stack_size = calc_need_stack_size(exe->code, exe->code_size);
 }
 

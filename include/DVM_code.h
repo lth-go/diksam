@@ -8,7 +8,8 @@ typedef enum {
     DVM_BOOLEAN_TYPE,
     DVM_INT_TYPE,
     DVM_DOUBLE_TYPE,
-    DVM_STRING_TYPE
+    DVM_STRING_TYPE,
+    DVM_NULL_TYPE
 } DVM_BasicType;
 
 typedef struct DVM_TypeSpecifier_tag DVM_TypeSpecifier;
@@ -19,13 +20,18 @@ typedef struct {
 } DVM_LocalVariable;
 
 typedef enum {
-    DVM_FUNCTION_DERIVE
+    DVM_FUNCTION_DERIVE,
+    DVM_ARRAY_DERIVE
 } DVM_DeriveTag;
 
 typedef struct {
     int                 parameter_count;
     DVM_LocalVariable   *parameter;
 } DVM_FunctionDerive;
+
+typedef struct {
+    int dummy; /* make compiler happy */
+} DVM_ArrayDerive;
 
 typedef struct DVM_TypeDerive_tag {
     DVM_DeriveTag       tag;
@@ -40,7 +46,6 @@ struct DVM_TypeSpecifier_tag {
     DVM_TypeDerive      *derive;
 };
 
-
 typedef wchar_t DVM_Char;
 typedef unsigned char DVM_Byte;
 
@@ -52,20 +57,28 @@ typedef enum {
     DVM_PUSH_DOUBLE_1,
     DVM_PUSH_DOUBLE,
     DVM_PUSH_STRING,
+    DVM_PUSH_NULL,
     /**********/
     DVM_PUSH_STACK_INT,
     DVM_PUSH_STACK_DOUBLE,
-    DVM_PUSH_STACK_STRING,
+    DVM_PUSH_STACK_OBJECT,
     DVM_POP_STACK_INT,
     DVM_POP_STACK_DOUBLE,
-    DVM_POP_STACK_STRING,
+    DVM_POP_STACK_OBJECT,
     /**********/
     DVM_PUSH_STATIC_INT,
     DVM_PUSH_STATIC_DOUBLE,
-    DVM_PUSH_STATIC_STRING,
+    DVM_PUSH_STATIC_OBJECT,
     DVM_POP_STATIC_INT,
     DVM_POP_STATIC_DOUBLE,
-    DVM_POP_STATIC_STRING,
+    DVM_POP_STATIC_OBJECT,
+    /**********/
+    DVM_PUSH_ARRAY_INT,
+    DVM_PUSH_ARRAY_DOUBLE,
+    DVM_PUSH_ARRAY_OBJECT,
+    DVM_POP_ARRAY_INT,
+    DVM_POP_ARRAY_DOUBLE,
+    DVM_POP_ARRAY_OBJECT,
     /**********/
     DVM_ADD_INT,
     DVM_ADD_DOUBLE,
@@ -89,6 +102,7 @@ typedef enum {
     DVM_CAST_DOUBLE_TO_STRING,
     DVM_EQ_INT,
     DVM_EQ_DOUBLE,
+    DVM_EQ_OBJECT,
     DVM_EQ_STRING,
     DVM_GT_INT,
     DVM_GT_DOUBLE,
@@ -104,6 +118,7 @@ typedef enum {
     DVM_LE_STRING,
     DVM_NE_INT,
     DVM_NE_DOUBLE,
+    DVM_NE_OBJECT,
     DVM_NE_STRING,
     DVM_LOGICAL_AND,
     DVM_LOGICAL_OR,
@@ -116,7 +131,12 @@ typedef enum {
     /**********/
     DVM_PUSH_FUNCTION,
     DVM_INVOKE,
-    DVM_RETURN
+    DVM_RETURN,
+    /**********/
+    DVM_NEW_ARRAY,
+    DVM_NEW_ARRAY_LITERAL_INT,
+    DVM_NEW_ARRAY_LITERAL_DOUBLE,
+    DVM_NEW_ARRAY_LITERAL_OBJECT
 } DVM_Opcode;
 
 typedef enum {
@@ -167,6 +187,8 @@ struct DVM_Excecutable_tag {
     DVM_Variable        *global_variable;
     int                 function_count;
     DVM_Function        *function;
+    int                 type_specifier_count;
+    DVM_TypeSpecifier   *type_specifier;
     int                 code_size;
     DVM_Byte            *code;
     int                 line_number_size;

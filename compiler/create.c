@@ -37,7 +37,7 @@ dkc_alloc_declaration(TypeSpecifier *type, char *identifier)
 }
 
 static FunctionDefinition *
-create_function_definition(DVM_BasicType type, char *identifier,
+create_function_definition(TypeSpecifier *type, char *identifier,
                            ParameterList *parameter_list, Block *block)
 {
     FunctionDefinition *fd;
@@ -46,7 +46,7 @@ create_function_definition(DVM_BasicType type, char *identifier,
     compiler = dkc_get_current_compiler();
 
     fd = dkc_malloc(sizeof(FunctionDefinition));
-    fd->type = dkc_alloc_type_specifier(type);
+    fd->type = type;
     fd->name = identifier;
     fd->parameter = parameter_list;
     fd->block = block;
@@ -54,13 +54,14 @@ create_function_definition(DVM_BasicType type, char *identifier,
     compiler->function_count++;
     fd->local_variable_count = 0;
     fd->local_variable = NULL;
+    fd->end_line_number = compiler->current_line_number;
     fd->next = NULL;
 
     return fd;
 }
 
 void
-dkc_function_define(DVM_BasicType type, char *identifier,
+dkc_function_define(TypeSpecifier *type, char *identifier,
                     ParameterList *parameter_list, Block *block)
 {
     FunctionDefinition *fd;
@@ -93,13 +94,13 @@ dkc_function_define(DVM_BasicType type, char *identifier,
 }
 
 ParameterList *
-dkc_create_parameter(DVM_BasicType type, char *identifier)
+dkc_create_parameter(TypeSpecifier *type, char *identifier)
 {
     ParameterList       *p;
 
     p = dkc_malloc(sizeof(ParameterList));
     p->name = identifier;
-    p->type = dkc_alloc_type_specifier(type);
+    p->type = type;
     p->line_number = dkc_get_current_compiler()->current_line_number;
     p->next = NULL;
 
@@ -107,7 +108,7 @@ dkc_create_parameter(DVM_BasicType type, char *identifier)
 }
 
 ParameterList *
-dkc_chain_parameter(ParameterList *list, DVM_BasicType type,
+dkc_chain_parameter(ParameterList *list, TypeSpecifier *type,
                     char *identifier)
 {
     ParameterList *pos;
@@ -143,6 +144,30 @@ dkc_chain_argument_list(ArgumentList *list, Expression *expr)
     return list;
 }
 
+ExpressionList *
+dkc_create_expression_list(Expression *expression)
+{
+    ExpressionList *el;
+
+    el = dkc_malloc(sizeof(ExpressionList));
+    el->expression = expression;
+    el->next = NULL;
+
+    return el;
+}
+
+ExpressionList *
+dkc_chain_expression_list(ExpressionList *list, Expression *expr)
+{
+    ExpressionList *pos;
+
+    for (pos = list; pos->next; pos = pos->next)
+        ;
+    pos->next = dkc_create_expression_list(expr);
+
+    return list;
+}
+
 StatementList *
 dkc_create_statement_list(Statement *statement)
 {
@@ -168,6 +193,38 @@ dkc_chain_statement_list(StatementList *list, Statement *statement)
     pos->next = dkc_create_statement_list(statement);
 
     return list;
+}
+
+TypeSpecifier *
+dkc_create_type_specifier(DVM_BasicType basic_type)
+{
+    TypeSpecifier *type;
+
+    type = dkc_malloc(sizeof(TypeSpecifier));
+    type->basic_type = basic_type;
+    type->derive = NULL;
+
+    return type;
+}
+
+TypeSpecifier *
+dkc_create_array_type_specifier(TypeSpecifier *base)
+{
+    TypeDerive *new_derive;
+    
+    new_derive = dkc_alloc_type_derive(ARRAY_DERIVE);
+
+    if (base->derive == NULL) {
+        base->derive = new_derive;
+    } else {
+        TypeDerive *derive_p;
+        for (derive_p = base->derive; derive_p->next != NULL;
+             derive_p = derive_p->next)
+            ;
+        derive_p->next = new_derive;
+    }
+
+    return base;
 }
 
 Expression *
@@ -272,6 +329,18 @@ dkc_create_logical_not_expression(Expression *operand)
 }
 
 Expression *
+dkc_create_index_expression(Expression *array, Expression *index)
+{
+    Expression *exp;
+
+    exp = dkc_alloc_expression(INDEX_EXPRESSION);
+    exp->u.index_expression.array = array;
+    exp->u.index_expression.index = index;
+
+    return exp;
+}
+
+Expression *
 dkc_create_incdec_expression(Expression *operand, ExpressionKind inc_or_dec)
 {
     Expression *exp;
@@ -308,6 +377,19 @@ dkc_create_function_call_expression(Expression *function,
 }
 
 Expression *
+dkc_create_member_expression(Expression *expression, char *member_name)
+{
+    Expression  *exp;
+
+    exp = dkc_alloc_expression(MEMBER_EXPRESSION);
+    exp->u.member_expression.expression = expression;
+    exp->u.member_expression.member_name = member_name;
+
+    return exp;
+}
+
+
+Expression *
 dkc_create_boolean_expression(DVM_Boolean value)
 {
     Expression *exp;
@@ -316,6 +398,65 @@ dkc_create_boolean_expression(DVM_Boolean value)
     exp->u.boolean_value = value;
 
     return exp;
+}
+
+Expression *
+dkc_create_null_expression(void)
+{
+    Expression  *exp;
+
+    exp = dkc_alloc_expression(NULL_EXPRESSION);
+
+    return exp;
+}
+
+Expression *
+dkc_create_array_literal_expression(ExpressionList *list)
+{
+    Expression  *exp;
+
+    exp = dkc_alloc_expression(ARRAY_LITERAL_EXPRESSION);
+    exp->u.array_literal = list;
+
+    return exp;
+}
+
+Expression *dkc_create_array_creation(DVM_BasicType basic_type,
+                                      ArrayDimension *dim_expr_list,
+                                      ArrayDimension *dim_list)
+{
+    Expression  *exp;
+
+    exp = dkc_alloc_expression(ARRAY_CREATION_EXPRESSION);
+    exp->u.array_creation.type = dkc_create_type_specifier(basic_type);
+    exp->u.array_creation.dimension
+        = dkc_chain_array_dimension(dim_expr_list, dim_list);
+
+    return exp;
+}
+
+ArrayDimension *
+dkc_create_array_dimension(Expression *expr)
+{
+    ArrayDimension *dim;
+
+    dim = dkc_malloc(sizeof(ArrayDimension));
+    dim->expression = expr;
+    dim->next = NULL;
+
+    return dim;
+}
+
+ArrayDimension *
+dkc_chain_array_dimension(ArrayDimension *list, ArrayDimension *dim)
+{
+    ArrayDimension *pos;
+
+    for (pos = list; pos->next != NULL; pos = pos->next)
+        ;
+    pos->next = dim;
+
+    return list;
 }
 
 static Statement *
@@ -519,7 +660,7 @@ dkc_create_throw_statement(Expression *expression)
 }
 
 Statement *
-dkc_create_declaration_statement(DVM_BasicType type, char *identifier,
+dkc_create_declaration_statement(TypeSpecifier *type, char *identifier,
                                  Expression *initializer)
 {
     Statement *st;
@@ -527,7 +668,7 @@ dkc_create_declaration_statement(DVM_BasicType type, char *identifier,
 
     st = alloc_statement(DECLARATION_STATEMENT);
 
-    decl = dkc_alloc_declaration(dkc_alloc_type_specifier(type), identifier);
+    decl = dkc_alloc_declaration(type, identifier);
 
     decl->initializer = initializer;
 

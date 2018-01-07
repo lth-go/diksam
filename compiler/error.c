@@ -74,7 +74,7 @@ search_argument(MessageArgument *arg_list,
 }
 
 static void
-format_message(int line_number, ErrorDefinition *format, VString *v,
+format_message(int line_number, ErrorDefinition *format, VWString *v,
                va_list ap)
 {
     int         i;
@@ -93,7 +93,7 @@ format_message(int line_number, ErrorDefinition *format, VString *v,
     
     for (i = 0; wc_format[i] != L'\0'; i++) {
         if (wc_format[i] != L'$') {
-            dkc_vstr_append_character(v, wc_format[i]);
+            dkc_vwstr_append_character(v, wc_format[i]);
             continue;
         }
         assert(wc_format[i+1] == L'(');
@@ -110,26 +110,26 @@ format_message(int line_number, ErrorDefinition *format, VString *v,
         case INT_MESSAGE_ARGUMENT:
             sprintf(buf, "%d", cur_arg.u.int_val);
             dvm_mbstowcs(buf, wc_buf);
-            dkc_vstr_append_string(v, wc_buf);
+            dkc_vwstr_append_string(v, wc_buf);
             break;
         case DOUBLE_MESSAGE_ARGUMENT:
             sprintf(buf, "%f", cur_arg.u.double_val);
             dvm_mbstowcs(buf, wc_buf);
-            dkc_vstr_append_string(v, wc_buf);
+            dkc_vwstr_append_string(v, wc_buf);
             break;
         case STRING_MESSAGE_ARGUMENT:
             dvm_mbstowcs(cur_arg.u.string_val, wc_buf);
-            dkc_vstr_append_string(v, wc_buf);
+            dkc_vwstr_append_string(v, wc_buf);
             break;
         case POINTER_MESSAGE_ARGUMENT:
             sprintf(buf, "%p", cur_arg.u.pointer_val);
             dvm_mbstowcs(buf, wc_buf);
-            dkc_vstr_append_string(v, wc_buf);
+            dkc_vwstr_append_string(v, wc_buf);
             break;
         case CHARACTER_MESSAGE_ARGUMENT:
             sprintf(buf, "%c", cur_arg.u.character_val);
             dvm_mbstowcs(buf, wc_buf);
-            dkc_vstr_append_string(v, wc_buf);
+            dkc_vwstr_append_string(v, wc_buf);
             break;
         case MESSAGE_ARGUMENT_END:
             assert(0);
@@ -160,12 +160,12 @@ void
 dkc_compile_error(int line_number, CompileError id, ...)
 {
     va_list     ap;
-    VString     message;
+    VWString    message;
 
     self_check();
     va_start(ap, id);
 
-    dkc_vstr_clear(&message);
+    dkc_vwstr_clear(&message);
     format_message(line_number,
                    &dkc_error_message_format[id],
                    &message, ap);
